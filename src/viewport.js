@@ -277,10 +277,36 @@ export class Viewport {
   }
 
   /**
+   * Bounding box dari mesh saja: sprite label, AxesHelper, dan objek bertanda
+   * `ucfHelper` tidak ikut supaya ukuran model tidak terpengaruh helper.
+   * SkinnedMesh dihitung memakai posisi verteks setelah skinning.
+   */
+  boundsOf(root) {
+    const box = new THREE.Box3();
+    if (!root) return box;
+    root.updateMatrixWorld(true);
+    root.traverse((object) => {
+      if (!object.isMesh || !object.geometry) return;
+      if (object.userData?.ucfHelper) return;
+      let localBox;
+      if (object.isSkinnedMesh) {
+        object.computeBoundingBox();
+        localBox = object.boundingBox;
+      } else {
+        if (!object.geometry.boundingBox) object.geometry.computeBoundingBox();
+        localBox = object.geometry.boundingBox;
+      }
+      if (!localBox || localBox.isEmpty()) return;
+      box.union(localBox.clone().applyMatrix4(object.matrixWorld));
+    });
+    return box;
+  }
+
+  /**
    * Tambah model ke scene: kaki di y=0, pusat X/Z pada slot, tanpa mengubah skala sumber.
    */
   addModel(root, meta = {}) {
-    const localBox = new THREE.Box3().setFromObject(root);
+    const localBox = this.boundsOf(root);
     const size = localBox.getSize(new THREE.Vector3());
     const width = Number.isFinite(size.x) && size.x > 0 ? size.x : 0.5;
     const slotX = this._nextSlotX(width);
@@ -294,7 +320,7 @@ export class Viewport {
     root.updateMatrixWorld(true);
     this.modelRoot.add(root);
 
-    const bbox = new THREE.Box3().setFromObject(root);
+    const bbox = this.boundsOf(root);
     const bboxHelper = new THREE.Box3Helper(bbox.clone(), 0x64748b);
     bboxHelper.name = `Helper_BBox_${meta.name || 'model'}`;
     bboxHelper.userData.ucfHelper = true;
@@ -323,6 +349,20 @@ export class Viewport {
     return model;
   }
 
+  /** Tambah objek bantu (skeleton, label) — tidak pernah dihitung sebagai model. */
+  addHelper(object) {
+    object.userData.ucfHelper = true;
+    this.helperRoot.add(object);
+    return object;
+  }
+
+  removeHelper(object) {
+    if (!object) return false;
+    this.helperRoot.remove(object);
+    this._disposeObject?.(object);
+    return true;
+  }
+
   /** Raycast untuk pengujian: kembalikan objek terdekat di koordinat layar. */
   pickAt(clientX, clientY) {
     const rect = this.renderer.domElement.getBoundingClientRect();
@@ -349,7 +389,7 @@ export class Viewport {
     const model = this.modelById(id);
     if (!model) return false;
     model.root.updateMatrixWorld(true);
-    model.bbox.setFromObject(model.root);
+    model.bbox.copy(this.boundsOf(model.root));
     model.bboxHelper.box.copy(model.bbox);
     model.bboxHelper.updateMatrixWorld(true);
     this.options.onModelsChanged?.(this.models);
@@ -366,7 +406,7 @@ export class Viewport {
     }
     model.root.add(content);
     model.root.updateMatrixWorld(true);
-    model.bbox.setFromObject(model.root);
+    model.bbox.copy(this.boundsOf(model.root));
     model.bboxHelper.box.copy(model.bbox);
     model.bboxHelper.updateMatrixWorld(true);
     if (stats) model.stats = stats;
@@ -477,7 +517,7 @@ export class Viewport {
       this.selectionHelper.visible = false;
       return null;
     }
-    const box = new THREE.Box3().setFromObject(object);
+    const box = this.boundsOf(object);
     if (box.isEmpty()) {
       this.selectionHelper.visible = false;
       return null;

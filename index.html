@@ -4,8 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="color-scheme" content="dark" />
-  <meta name="description" content="Universal Character Foundry v1.1 — Tahap 1: viewport 3D, kontrol kamera, dan impor GLB/glTF." />
-  <title>Universal Character Foundry — Tahap 1</title>
+  <meta name="description" content="Universal Character Foundry v1.1 — Tahap 3: viewport 3D, humanoid prosedural, dan rigging sampai ruas jari." />
+  <title>Universal Character Foundry — Tahap 3</title>
   <link rel="stylesheet" href="./src/styles.css" />
 </head>
 <body>
@@ -15,7 +15,7 @@
         <div class="brand-mark" aria-hidden="true">UCF</div>
         <div class="brand-text">
           <strong>Universal Character Foundry</strong>
-          <span>v1.1 · Tahap 1 — viewport &amp; impor</span>
+          <span>v1.1 · Tahap 3 — rigging &amp; skin</span>
         </div>
       </div>
       <div class="topbar-actions">
@@ -129,9 +129,31 @@
           <div id="humanoidReadout" class="humanoid-readout hidden"></div>
         </section>
 
+        <section class="panel-section" id="rigSection">
+          <div class="section-head"><h2>6 · Rigging &amp; skin</h2><span id="rigSummary" class="count">—</span></div>
+          <div class="rig-toggles">
+            <label class="check"><input id="toggleSkeleton" type="checkbox" /> <span>Tampilkan skeleton</span></label>
+            <label class="check"><input id="toggleBoneNames" type="checkbox" /> <span>Nama tulang</span></label>
+          </div>
+          <label class="field"><span>Tulang terpilih</span>
+            <select id="boneSelect" class="select" disabled></select>
+          </label>
+          <div class="rig-rotors">
+            <label class="param-row"><span>Rotasi X</span><input id="boneRotX" type="range" min="-90" max="90" step="1" value="0" disabled /><output id="boneRotXOut">0°</output></label>
+            <label class="param-row"><span>Rotasi Y</span><input id="boneRotY" type="range" min="-90" max="90" step="1" value="0" disabled /><output id="boneRotYOut">0°</output></label>
+            <label class="param-row"><span>Rotasi Z</span><input id="boneRotZ" type="range" min="-90" max="90" step="1" value="0" disabled /><output id="boneRotZOut">0°</output></label>
+          </div>
+          <div class="row-buttons wrap">
+            <button id="resetBonePose" class="btn" type="button" disabled>Reset pose</button>
+            <button id="testDeformation" class="btn" type="button" disabled>Uji deformasi</button>
+            <button id="checkWeights" class="btn" type="button" disabled>Cek weights</button>
+          </div>
+          <div id="boneInfo" class="hint">Buat humanoid untuk memeriksa skeleton dan skin weights.</div>
+        </section>
+
         <section class="panel-section grow">
           <div class="section-head">
-            <h2>6 · Status validasi</h2>
+            <h2>7 · Status validasi</h2>
             <span id="validationSummary" class="count">—</span>
           </div>
           <div id="validationList" class="validation-list" aria-live="polite"></div>
@@ -141,10 +163,10 @@
         <section class="panel-section">
           <div class="section-head"><h2>Batasan tahap ini</h2></div>
           <p class="hint">
-            Tahap 2a mencakup pembuatan humanoid prosedural, 21 parameter inti (proporsi, kepala, tubuh,
-            panjang lengan/kaki), reset, duplikat, undo/redo, serta simpan/muat config.
-            Menyusul di 2b: 14 parameter tangan dan kaki. Belum aktif: rigging/skinning, modul pakaian,
-            animasi/retargeting, ekspor. Tombol untuk fitur yang belum ada sengaja tidak dibuat.
+            Tahap 3 mencakup 35 parameter humanoid, skeleton 51 tulang sampai ruas jari, skin weights
+            yang terhitung, uji rotasi sendi, reset pose, serta pemeriksaan deformasi &amp; bobot.
+            Belum aktif: modul pakaian, animasi/retargeting, ekspor. Tombol untuk fitur yang belum ada
+            sengaja tidak dibuat.
           </p>
         </section>
       </aside>

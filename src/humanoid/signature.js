@@ -1,6 +1,10 @@
 /**
- * UCF Tahap 2 — sidik jari geometri untuk membandingkan bentuk karakter.
- * Dipakai untuk membuktikan simpan/muat menghasilkan bentuk identik.
+ * UCF Tahap 3 — sidik jari bentuk untuk membandingkan karakter.
+ * Untuk mesh ber-skin, hash memakai posisi verteks SETELAH deformasi tulang,
+ * sehingga pose dan rotasi sendi ikut terukur.
+ *
+ * geometryHash  : bentuk relatif terhadap root karakter (tidak terpengaruh posisi di dunia)
+ * worldHash     : bentuk + penempatan/transform root di dunia
  */
 import * as THREE from 'three';
 
@@ -13,64 +17,91 @@ export function fnv1aFromBytes(bytes) {
   return hash.toString(16).padStart(8, '0');
 }
 
+function quantizedBytes(values) {
+  const bytes = new Uint8Array(values.length * 4);
+  const view = new DataView(bytes.buffer);
+  for (let i = 0; i < values.length; i += 1) {
+    view.setInt32(i * 4, Math.round(values[i] * 10000), true);
+  }
+  return bytes;
+}
+
 /**
  * @param {THREE.Object3D} root
- * @param {{world?: boolean}} [options]
  * @returns {{parts:number, vertices:number, triangles:number, materials:number,
  *   geometryHash:string, worldHash:string, size:number[], minY:number}}
  */
-export function objectSignature(root, { world = true } = {}) {
+export function objectSignature(root) {
   if (!root) return null;
   root.updateMatrixWorld(true);
 
-  const encoder = new TextEncoder();
-  const parts = [];
+  const toLocal = new THREE.Matrix4().copy(root.matrixWorld).invert();
+
+  const localParts = [];
+  const worldParts = [];
   const materials = new Set();
   let vertices = 0;
   let triangles = 0;
 
+  const box = new THREE.Box3();
+  const point = new THREE.Vector3();
+  const local = new THREE.Vector3();
+
+  const meshes = [];
   root.traverse((object) => {
-    if (!object.isMesh || !object.geometry) return;
-    const position = object.geometry.getAttribute?.('position');
-    if (!position) return;
-
-    vertices += position.count;
-    const index = object.geometry.getIndex?.();
-    triangles += Math.floor((index ? index.count : position.count) / 3);
-
-    const materialList = object.material
-      ? Array.isArray(object.material) ? object.material : [object.material]
-      : [];
-    for (const material of materialList) if (material) materials.add(material);
-
-    const bytes = new Uint8Array(position.array.buffer, position.array.byteOffset, position.array.byteLength);
-    const localHash = fnv1aFromBytes(bytes);
-    const matrix = world
-      ? object.matrixWorld.elements.map((value) => value.toFixed(5)).join(',')
-      : '0';
-    parts.push({ name: object.name || `mesh-${parts.length}`, count: position.count, hash: localHash, matrix });
+    if (object.isMesh && object.geometry && !object.userData?.ucfHelper) meshes.push(object);
   });
 
-  parts.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  for (const mesh of meshes) {
+    const position = mesh.geometry.getAttribute?.('position');
+    if (!position) continue;
 
-  const geometryHash = fnv1aFromBytes(encoder.encode(JSON.stringify(parts.map((part) => ({
-    name: part.name,
-    count: part.count,
-    hash: part.hash
-  })))));
-  const worldHash = fnv1aFromBytes(encoder.encode(JSON.stringify(parts)));
+    vertices += position.count;
+    const index = mesh.geometry.getIndex?.();
+    triangles += Math.floor((index ? index.count : position.count) / 3);
 
-  const box = new THREE.Box3().setFromObject(root);
+    const materialList = mesh.material ? (Array.isArray(mesh.material) ? mesh.material : [mesh.material]) : [];
+    for (const material of materialList) if (material) materials.add(material);
+
+    const worldValues = new Float32Array(position.count * 3);
+    const localValues = new Float32Array(position.count * 3);
+
+    for (let i = 0; i < position.count; i += 1) {
+      point.fromBufferAttribute(position, i);
+      if (mesh.isSkinnedMesh) mesh.applyBoneTransform(i, point);
+      point.applyMatrix4(mesh.matrixWorld);
+      box.expandByPoint(point);
+      worldValues[i * 3] = point.x;
+      worldValues[i * 3 + 1] = point.y;
+      worldValues[i * 3 + 2] = point.z;
+
+      local.copy(point).applyMatrix4(toLocal);
+      localValues[i * 3] = local.x;
+      localValues[i * 3 + 1] = local.y;
+      localValues[i * 3 + 2] = local.z;
+    }
+
+    const name = mesh.name || `mesh-${localParts.length}`;
+    localParts.push({ name, count: position.count, hash: fnv1aFromBytes(quantizedBytes(localValues)) });
+    worldParts.push({ name, count: position.count, hash: fnv1aFromBytes(quantizedBytes(worldValues)) });
+  }
+
+  const sortByName = (a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+  localParts.sort(sortByName);
+  worldParts.sort(sortByName);
+
+  const geometryHash = fnv1aFromBytes(new TextEncoder().encode(JSON.stringify(localParts)));
+  const worldHash = fnv1aFromBytes(new TextEncoder().encode(JSON.stringify(worldParts)));
   const size = box.getSize(new THREE.Vector3());
 
   return {
-    parts: parts.length,
+    parts: localParts.length,
     vertices,
     triangles,
     materials: materials.size,
     geometryHash,
     worldHash,
     size: size.toArray(),
-    minY: box.min.y
+    minY: box.isEmpty() ? 0 : box.min.y
   };
 }

@@ -834,6 +834,12 @@ window.__ucf = {
   get camera() {
     return viewport.cameraState();
   },
+  get cameraObject() {
+    return viewport.camera;
+  },
+  get controls() {
+    return viewport.controls;
+  },
   get toggles() {
     return { ...viewport.toggles };
   },

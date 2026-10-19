@@ -122,9 +122,11 @@ test('tangan punya lima jari; parameter jari mengubah mesh', () => {
   const names = [];
   content.traverse((object) => { if (object.name) names.push(object.name); });
   for (const side of ['R', 'L']) {
-    assert.ok(names.includes(`Thumb_${side}`));
+    assert.ok(names.includes(`Thumb_${side}_1`), `tulang ibu jari ${side} tidak ada`);
+    assert.ok(names.includes(`Thumb_${side}_2`), `ruas ke-2 ibu jari ${side} tidak ada`);
     for (const finger of ['Index', 'Middle', 'Ring', 'Pinky']) {
       assert.ok(names.includes(`Finger_${finger}_${side}_1`), `jari ${finger} ${side} tidak ada`);
+      assert.ok(names.includes(`Finger_${finger}_${side}_2`), `ruas ke-2 ${finger} ${side} tidak ada`);
       assert.ok(names.includes(`Finger_${finger}_${side}_3`), `ruas ke-3 ${finger} ${side} tidak ada`);
     }
   }

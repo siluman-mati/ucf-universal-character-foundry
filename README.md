@@ -1,8 +1,9 @@
-# Universal Character Foundry (UCF) v1.1 — Tahap 1
+# Universal Character Foundry (UCF) v1.1 — Tahap 3
 
 Aplikasi web mandiri untuk pembuatan karakter 3D. **Tahap 1** mencakup viewport 3D,
-kontrol kamera lengkap, helper tampilan, hierarki objek, dan impor GLB/glTF.
-Proyek terpisah dari rigPro A.0 dan tidak mengubahnya.
+kontrol kamera, helper tampilan, hierarki objek, dan impor GLB/glTF; **Tahap 2** menambah
+humanoid prosedural 35 parameter; **Tahap 3** menambah skeleton 51 tulang sampai ruas jari,
+skin weights, dan pengujian deformasi. Proyek terpisah dari rigPro A.0 dan tidak mengubahnya.
 
 ## Yang sudah berfungsi pada tahap ini
 
@@ -38,11 +39,11 @@ di sesi baru. Browser untuk Playwright juga perlu dipasang ulang:
 ## Tes
 
 ```bash
-npm test                              # 17 tes unit Tahap 1
-node --test tests/humanoid-unit.test.mjs  # 12 tes unit humanoid
+npm test                              # 37 tes unit (17 viewport/impor + 12 humanoid + 8 rig)
 node scripts/serve.mjs 4173 &         # setelah npm run build
 node tests/e2e-stage1.mjs             # 42 cek browser Tahap 1
 node tests/e2e-stage2.mjs             # 18 cek browser humanoid (2a+2b+2c)
+node tests/e2e-stage3.mjs             # 15 cek browser rigging & deformasi
 ```
 
 E2E menulis `../ucf-audit/stage1-e2e.json` dan `../ucf-audit/screenshots/*.png`
@@ -80,10 +81,33 @@ visual). **Reset**, **Duplikat**, **Hapus**, ganti nama, pose T/A/netral, **Undo
 berfungsi. Readout menampilkan tinggi aktual, jumlah mesh/verteks/segitiga, material, dan
 hash geometri (FNV-1a).
 
+## Tahap 3 — rigging & skinning
+
+Seksi 6 di panel kanan menampilkan dan menguji rig karakter terpilih.
+
+- **Skeleton 51 tulang**: `Root → Hips → Spine → Chest → Neck → Head → HeadTop`,
+  `Chest → Clavicle → UpperArm → LowerArm → Hand`, `Hand → Finger_{Index,Middle,Ring,Pinky}_{1,2,3}`
+  dan `Thumb_{1,2}` (28 tulang jari), `Hips → UpperLeg → LowerLeg → Foot → Toe`.
+- **Skin weights nyata**: setiap verteks (4.652) punya 1–2 pengaruh, jumlah bobot dinormalkan
+  (galat maksimum 2,2 × 10⁻¹⁶), tanpa verteks tanpa bobot. Bobot dibatasi ke rantai tulang
+  mesh yang bersangkutan (`candidateBonesForMesh`) supaya lengan tidak menarik torso.
+- **Pilih tulang**, lihat induk/jumlah anak, putar sumbu X/Y/Z lewat slider, **reset pose**,
+  **uji deformasi** (mengukur perpindahan verteks + memastikan kepala tidak ikut), dan
+  **cek weights**; hasil masuk log validasi grup B.
+- Toggle **skeleton** (`THREE.SkeletonHelper`) dan **nama tulang** (label sprite).
+  Helper berada di grup `UCF_Helpers`, `userData.ucfHelper = true`, **tidak berada di dalam
+  model** sehingga tidak ikut terhitung sebagai bagian karakter.
+- Pose T/A/netral diterapkan lewat rotasi tulang, bukan membangun ulang geometri;
+  bind pose selalu T. Simpan/muat config mempertahankan rig, pose, dan bentuk.
+
 ## Batasan saat ini (jangan diklaim lebih)
 
-- Humanoid belum punya **skeleton, weights, atau rigging**; Tahap 3 belum dikerjakan.
-- Bentuk manekin masih kasar (tanpa tekstur/wajah); kualitas visual belum final.
+- Bentuk manekin masih kasar (tanpa tekstur/wajah, tanpa rig wajah); kualitas visual belum final
+  dan **bukan topology siap produksi**.
+- Belum ada IK, kontrol rig, atau auto-rig untuk model eksternal; rig hanya untuk humanoid
+  prosedural UCF.
+- Deformasi diuji secara numerik (perpindahan verteks) dan lewat screenshot; belum ada
+  pengujian animasi/klip (Tahap 5).
 - Nilai parameter 3 desimal; slider memakai langkah 0,001 m agar nilai default dapat
   dikembalikan persis.
 - Belum ada modul pakaian, animasi/retargeting, maupun ekspor. Klip animasi hanya

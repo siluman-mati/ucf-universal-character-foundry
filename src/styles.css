@@ -319,3 +319,14 @@ table.kv td { font-family: var(--mono); font-variant-numeric: tabular-nums; text
 .readout-grid { display: grid; grid-template-columns: 1fr auto; gap: 3px 8px; font-size: 11px; }
 .readout-grid span { color: var(--muted); }
 .readout-grid b { font-family: var(--mono); font-weight: 600; color: #dbeafe; text-align: right; }
+
+/* ---------- rigging (Tahap 3) ---------- */
+.rig-toggles { display: grid; gap: 6px; margin: 8px 0 10px; }
+.rig-rotors { display: grid; gap: 4px; margin: 8px 0 10px; }
+.rig-rotors .param-row { grid-template-columns: 74px 1fr 44px; }
+.select, select.select {
+  width: 100%; font: inherit; font-size: 12px; padding: 6px 8px;
+  color: var(--text); background: #0a1626; border: 1px solid var(--line-2); border-radius: 8px;
+}
+.bone-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.bone-row .name { font-family: var(--mono); font-size: 11.5px; color: #bae6fd; }

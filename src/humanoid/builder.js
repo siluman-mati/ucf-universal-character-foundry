@@ -5,23 +5,20 @@
  */
 import * as THREE from 'three';
 import { defaultParams, clampParam, NOMINAL_HEIGHT } from './params.js';
+import { rigify, applyPose, POSE_ANGLES, computeDeformedBounds } from './rig.js';
 
 const DEG = Math.PI / 180;
 const TORSO_SEGMENTS = 24;
 const HEAD_SEGMENTS = 22;
 
-export const POSE_ANGLES = Object.freeze({
-  T: { shoulder: 90, elbow: 0, foot: 0 },
-  A: { shoulder: 45, elbow: 5, foot: 4 },
-  netral: { shoulder: 12, elbow: 9, foot: 7 }
-});
+export { POSE_ANGLES };
 
 function createMaterials() {
   return {
     skin: new THREE.MeshStandardMaterial({ name: 'Kulit', color: 0xd9a17d, roughness: 0.86, metalness: 0 }),
     shirt: new THREE.MeshStandardMaterial({ name: 'Kaos', color: 0x2f6f9f, roughness: 0.98 }),
     pants: new THREE.MeshStandardMaterial({ name: 'Celana', color: 0x27313f, roughness: 0.97 }),
-    shoes: new THREE.MeshStandardMaterial({ name: 'Sepatu', color: 0x151a22, roughness: 0.78 })
+    shoes: new THREE.MeshStandardMaterial({ name: 'Sepatu', color: 0x2b3442, roughness: 0.7 })
   };
 }
 
@@ -134,8 +131,8 @@ function buildHand(side, params, s, material) {
   const palmThickness = 0.038 * s;
 
   const palmRings = [
-    { y: -palmLength, rx: palmWidth * 0.46, rz: palmThickness * 0.34 },
-    { y: -palmLength * 0.74, rx: palmWidth * 0.5, rz: palmThickness * 0.5 },
+    { y: -palmLength, rx: palmWidth * 0.52, rz: palmThickness * 0.44 },
+    { y: -palmLength * 0.74, rx: palmWidth * 0.52, rz: palmThickness * 0.5 },
     { y: -palmLength * 0.32, rx: palmWidth * 0.48, rz: palmThickness * 0.5 },
     { y: -palmLength * 0.06, rx: palmWidth * 0.35, rz: palmThickness * 0.46 },
     { y: 0, rx: palmWidth * 0.42, rz: palmThickness * 0.5 }
@@ -169,6 +166,7 @@ function buildHand(side, params, s, material) {
       parent.add(bone);
       if (segment < 2) {
         const joint = new THREE.Group();
+        joint.name = `Finger_${finger.name}_${side}_J${segment + 2}`;
         joint.position.y = -segmentLength;
         joint.rotation.x = -9 * DEG * (segment + 1);
         parent.add(joint);
@@ -195,6 +193,7 @@ function buildHand(side, params, s, material) {
     thumbParent.add(bone);
     if (segment === 0) {
       const joint = new THREE.Group();
+      joint.name = `Thumb_${side}_J2`;
       joint.position.y = -thumbSegment;
       joint.rotation.x = -14 * DEG;
       thumbParent.add(joint);
@@ -219,7 +218,8 @@ export function buildHumanoid(inputParams = {}, pose = 'T') {
     }
   }
   const poseKey = POSE_ANGLES[pose] ? pose : 'T';
-  const poseAngles = POSE_ANGLES[poseKey];
+  // geometri selalu dibangun pada bind pose T; pose lain diterapkan lewat rotasi tulang
+  const poseAngles = POSE_ANGLES.T;
 
   const s = params.height / NOMINAL_HEIGHT;
   const widthScale = params.bodyWidth;
@@ -263,7 +263,7 @@ export function buildHumanoid(inputParams = {}, pose = 'T') {
   /* ---------------- leher & kepala ---------------- */
   const neck = makeMesh(
     'Body_Neck',
-    limbUpGeometry(params.neckWidth * s * 0.48, params.neckWidth * s * 0.44, neckLength + 0.02 * s),
+    limbUpGeometry(params.neckWidth * s * 0.4, params.neckWidth * s * 0.33, neckLength + 0.035 * s),
     materials.skin,
     'neck'
   );
@@ -272,10 +272,10 @@ export function buildHumanoid(inputParams = {}, pose = 'T') {
 
   const jaw = params.jawWidth;
   const headProfile = [
-    { f: 0.0, w: 0.56 * jaw, d: 0.64 },
-    { f: 0.06, w: 0.72 * jaw, d: 0.8 },
-    { f: 0.16, w: 0.86 * jaw, d: 0.9 },
-    { f: 0.3, w: 0.95 * jaw, d: 0.96 },
+    { f: 0.0, w: 0.46 * jaw, d: 0.52 },
+    { f: 0.05, w: 0.66 * jaw, d: 0.72 },
+    { f: 0.13, w: 0.84 * jaw, d: 0.88 },
+    { f: 0.26, w: 0.94 * jaw, d: 0.95 },
     { f: 0.48, w: 1.0, d: 1.0 },
     { f: 0.66, w: 1.0, d: 1.0 },
     { f: 0.84, w: 0.9, d: 0.93 },
@@ -369,6 +369,8 @@ export function buildHumanoid(inputParams = {}, pose = 'T') {
   }
 
   content.updateMatrixWorld(true);
+  const meshesToDispose = [];
+  content.traverse((object) => { if (object.isMesh) meshesToDispose.push(object); });
 
   const metrics = {
     actualHeight: bodyY + torsoLength + neckLength + headHeight,
@@ -380,7 +382,24 @@ export function buildHumanoid(inputParams = {}, pose = 'T') {
     armSpanT: shoulderX * 2 + (upperArmLength + forearmLength + params.palmLength * s) * 2
   };
 
-  return { content, params, pose: poseKey, metrics };
+  const rig = rigify(content, { params, s, pose: poseKey });
+
+  for (const mesh of [...meshesToDispose]) mesh.geometry.dispose();
+  content.clear();
+
+  metrics.rig = rig.stats;
+  const content2 = rig.root;
+  content2.name = 'UCF_Content';
+  content2.userData.ucfRig = rig;
+  return { content: content2, params, pose: poseKey, metrics, rig };
+}
+
+/** Terapkan pose T/A/netral pada rig yang sudah ada. */
+export function setHumanoidPose(content, pose) {
+  const rig = content?.userData?.ucfRig;
+  if (!rig) return false;
+  applyPose(rig, pose);
+  return true;
 }
 
 /** Buang geometri & material milik satu content humanoid. */
@@ -401,12 +420,6 @@ export function disposeHumanoidContent(content) {
 
 /** Ukuran bounding box content (tanpa mengubah apa pun). */
 export function measureHumanoid(content) {
-  const box = new THREE.Box3().setFromObject(content);
-  const size = box.getSize(new THREE.Vector3());
-  return {
-    min: box.min.toArray(),
-    max: box.max.toArray(),
-    size: size.toArray(),
-    center: box.getCenter(new THREE.Vector3()).toArray()
-  };
+  const bounds = computeDeformedBounds(content);
+  return { min: bounds.min, max: bounds.max, size: bounds.size, center: bounds.center };
 }

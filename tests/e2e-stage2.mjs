@@ -96,8 +96,8 @@ async function main() {
   });
   results.measurements.created = created;
   check(
-    'S2-3. Humanoid dibuat: 53 mesh, 4.652 verteks, tanpa tulang (rigging belum ada)',
-    created.count === 1 && created.meshes === 53 && created.selected.geometry.vertices === 4652 && created.bones === 0,
+    'S2-3. Humanoid dibuat: 53 mesh, 4.652 verteks, 51 tulang (Tahap 3)',
+    created.count === 1 && created.meshes === 53 && created.selected.geometry.vertices === 4652 && created.bones === 51,
     { meshes: created.meshes, vertices: created.selected.geometry.vertices, bones: created.bones }
   );
   check(
@@ -108,7 +108,7 @@ async function main() {
       created.selected.geometry.size[2] > 0.15,
     { height: created.selected.height, minY: created.selected.geometry.minY, size: created.selected.geometry.size }
   );
-  check('S2-5. Hierarki & daftar model menampilkan karakter', /100 node/.test(created.hierarchy) && created.modelName === 'Humanoid 1', {
+  check('S2-5. Hierarki & daftar model menampilkan karakter', /106 node/.test(created.hierarchy) && created.modelName === 'Humanoid 1', {
     hierarchy: created.hierarchy,
     modelName: created.modelName
   });
