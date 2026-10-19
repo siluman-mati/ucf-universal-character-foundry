@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="description" content="Universal Character Foundry v1.1 — Tahap 1: viewport 3D, kontrol kamera, dan impor GLB/glTF." />
+  <title>Universal Character Foundry — Tahap 1</title>
+  <link rel="stylesheet" href="./src/styles.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">UCF</div>
+        <div class="brand-text">
+          <strong>Universal Character Foundry</strong>
+          <span>v1.1 · Tahap 1 — viewport &amp; impor</span>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <span id="engineBadge" class="badge" title="Mesin grafis">three.js memuat…</span>
+        <button id="toggleLeft" class="btn ghost mobile-only" type="button" aria-controls="panelLeft" aria-expanded="false">Impor</button>
+        <button id="toggleRight" class="btn ghost mobile-only" type="button" aria-controls="panelRight" aria-expanded="false">Tampilan</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside id="panelLeft" class="panel panel-left" aria-label="Panel impor dan hierarki">
+        <section class="panel-section">
+          <div class="section-head">
+            <h2>1 · Impor model</h2>
+            <span class="tag">GLB / glTF</span>
+          </div>
+          <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Area impor, klik atau lepaskan berkas GLB atau glTF">
+            <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M12 3v11m0-11 4 4m-4-4-4 4M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <div class="dropzone-title">Lepaskan berkas di sini</div>
+            <div class="dropzone-sub">atau <u>pilih berkas</u> · .glb, .gltf (self-contained)</div>
+            <input id="modelFile" type="file" accept=".glb,.gltf,model/gltf-binary,model/gltf+json" multiple hidden />
+          </div>
+          <p class="hint">Berkas uji tersedia di <code>ucf/test-assets/</code>. Model tanpa rig dan ber-skeleton sama-sama diterima.</p>
+          <div id="importReport" class="report hidden" aria-live="polite"></div>
+        </section>
+
+        <section class="panel-section grow">
+          <div class="section-head">
+            <h2>2 · Hierarki objek</h2>
+            <span id="hierarchyCount" class="count">0 node</span>
+          </div>
+          <input id="hierarchySearch" class="search" type="search" placeholder="Cari nama node…" aria-label="Cari node di hierarki" />
+          <div id="hierarchyTree" class="tree" role="tree" aria-label="Hierarki objek"></div>
+          <div id="nodeInfo" class="node-info">
+            <p class="muted">Klik node di hierarki atau mesh di viewport untuk melihat detail.</p>
+          </div>
+        </section>
+      </aside>
+
+      <section class="stage">
+        <div id="viewport" class="viewport" aria-label="Viewport 3D">
+          <div class="viewbar" role="toolbar" aria-label="Tampilan kamera">
+            <button class="chip" data-view="depan" type="button">Depan</button>
+            <button class="chip" data-view="belakang" type="button">Belakang</button>
+            <button class="chip" data-view="kiri" type="button">Kiri</button>
+            <button class="chip" data-view="kanan" type="button">Kanan</button>
+            <button class="chip" data-view="atas" type="button">Atas</button>
+            <button class="chip" data-view="perspektif" type="button">Perspektif</button>
+            <span class="viewbar-sep" aria-hidden="true"></span>
+            <button id="cameraFit" class="chip subtle" type="button" title="Muat seluruh model ke kamera (F)">Muat semua</button>
+            <button id="cameraReset" class="chip subtle" type="button" title="Kembalikan kamera ke perspektif awal (R)">Reset kamera</button>
+          </div>
+          <div id="busy" class="busy hidden" role="status" aria-live="polite">
+            <span class="spinner" aria-hidden="true"></span>
+            <span id="busyText">Memuat…</span>
+          </div>
+          <div id="dropOverlay" class="drop-overlay hidden" aria-hidden="true">
+            <div>Lepaskan berkas GLB / glTF</div>
+          </div>
+        </div>
+        <div class="statusbar">
+          <span id="statusText">Siap. Impor berkas .glb atau .gltf untuk mulai.</span>
+          <span id="renderInfo" class="mono">Belum ada model</span>
+        </div>
+      </section>
+
+      <aside id="panelRight" class="panel panel-right" aria-label="Panel tampilan dan validasi">
+        <section class="panel-section">
+          <div class="section-head"><h2>3 · Tampilan</h2></div>
+          <label class="check"><input id="toggleWireframe" type="checkbox" /> <span>Wireframe</span></label>
+          <label class="check"><input id="toggleGrid" type="checkbox" checked /> <span>Grid lantai</span></label>
+          <label class="check"><input id="toggleAxes" type="checkbox" checked /> <span>Sumbu X/Y/Z</span></label>
+          <label class="check"><input id="toggleBBox" type="checkbox" /> <span>Bounding box model</span></label>
+          <p class="hint">Grid, sumbu, dan bounding box adalah <strong>helper viewport</strong>: berada di grup terpisah, ditandai <code>ucfHelper</code>, dan tidak dihitung sebagai model.</p>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-head"><h2>4 · Model</h2><span id="modelCount" class="count">0 model</span></div>
+          <div id="modelList" class="model-list"></div>
+          <div class="row-buttons">
+            <button id="deleteSelected" class="btn danger" type="button">Hapus terpilih</button>
+            <button id="clearAll" class="btn" type="button">Bersihkan</button>
+          </div>
+        </section>
+
+        <section class="panel-section grow">
+          <div class="section-head">
+            <h2>5 · Status validasi</h2>
+            <span id="validationSummary" class="count">—</span>
+          </div>
+          <div id="validationList" class="validation-list" aria-live="polite"></div>
+          <button id="downloadValidation" class="btn block" type="button">Unduh laporan validasi (JSON)</button>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-head"><h2>Batasan tahap ini</h2></div>
+          <p class="hint">
+            Tahap 1 mencakup viewport, kamera, helper, hierarki, dan impor GLB/glTF.
+            Belum aktif: humanoid prosedural, rigging/skinning, modul pakaian, animasi/retargeting, ekspor.
+            Tombol untuk fitur yang belum ada sengaja tidak dibuat.
+          </p>
+        </section>
+      </aside>
+    </main>
+  </div>
+
+  <div id="drawerBackdrop" class="backdrop" hidden></div>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

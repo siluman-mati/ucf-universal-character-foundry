@@ -1,0 +1,23 @@
+{
+  "name": "ucf-universal-character-foundry",
+  "private": true,
+  "version": "1.1.0-stage1",
+  "description": "Universal Character Foundry v1.1 — Tahap 1: viewport 3D + impor GLB/glTF",
+  "type": "module",
+  "license": "UNLICENSED",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "serve": "node scripts/serve.mjs",
+    "test": "node --test tests/unit.test.mjs",
+    "test:e2e": "node tests/e2e-stage1.mjs"
+  },
+  "dependencies": {
+    "three": "0.180.0"
+  },
+  "devDependencies": {
+    "vite": "8.3.3",
+    "playwright": "1.64.1"
+  }
+}

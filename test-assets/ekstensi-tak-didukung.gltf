@@ -1,0 +1,112 @@
+{
+ "asset": {
+  "version": "2.0",
+  "generator": "UCF Tahap 1 fixture generator",
+  "copyright": "UCF project"
+ },
+ "scene": 0,
+ "scenes": [
+  {
+   "name": "Scene",
+   "nodes": [
+    0
+   ]
+  }
+ ],
+ "nodes": [
+  {
+   "name": "Kotak Ekstensi Uji",
+   "mesh": 0
+  }
+ ],
+ "meshes": [
+  {
+   "name": "Kotak",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 0,
+      "NORMAL": 1
+     },
+     "indices": 2,
+     "material": 0
+    }
+   ]
+  }
+ ],
+ "materials": [
+  {
+   "name": "Material_Fallback",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     0.85,
+     0.55,
+     0.2,
+     1.0
+    ],
+    "metallicFactor": 0.0,
+    "roughnessFactor": 0.7
+   }
+  }
+ ],
+ "buffers": [
+  {
+   "byteLength": 648,
+   "uri": "data:application/octet-stream;base64,AACAvgAAgL4AAIA+AACAPgAAgL4AAIA+AACAPgAAgD4AAIA+AACAvgAAgD4AAIA+AACAPgAAgL4AAIC+AACAvgAAgL4AAIC+AACAvgAAgD4AAIC+AACAPgAAgD4AAIC+AACAPgAAgL4AAIA+AACAPgAAgL4AAIC+AACAPgAAgD4AAIC+AACAPgAAgD4AAIA+AACAvgAAgL4AAIC+AACAvgAAgL4AAIA+AACAvgAAgD4AAIA+AACAvgAAgD4AAIC+AACAvgAAgD4AAIA+AACAPgAAgD4AAIA+AACAPgAAgD4AAIC+AACAvgAAgD4AAIC+AACAvgAAgL4AAIC+AACAPgAAgL4AAIC+AACAPgAAgL4AAIA+AACAvgAAgL4AAIA+AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIC/AAAAAAAAAAAAAIC/AAAAAAAAAAAAAIC/AAAAAAAAAAAAAIC/AACAPwAAAAAAAAAAAACAPwAAAAAAAAAAAACAPwAAAAAAAAAAAACAPwAAAAAAAAAAAACAvwAAAAAAAAAAAACAvwAAAAAAAAAAAACAvwAAAAAAAAAAAACAvwAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgL8AAAAAAAAAAAAAgL8AAAAAAAAAAAAAgL8AAAAAAAAAAAAAgL8AAAAAAAABAAIAAAACAAMABAAFAAYABAAGAAcACAAJAAoACAAKAAsADAANAA4ADAAOAA8AEAARABIAEAASABMAFAAVABYAFAAWABcA"
+  }
+ ],
+ "bufferViews": [
+  {
+   "buffer": 0,
+   "byteOffset": 0,
+   "byteLength": 288,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 288,
+   "byteLength": 288,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 576,
+   "byteLength": 72,
+   "target": 34963
+  }
+ ],
+ "accessors": [
+  {
+   "bufferView": 0,
+   "componentType": 5126,
+   "count": 24,
+   "type": "VEC3",
+   "min": [
+    -0.25,
+    -0.25,
+    -0.25
+   ],
+   "max": [
+    0.25,
+    0.25,
+    0.25
+   ]
+  },
+  {
+   "bufferView": 1,
+   "componentType": 5126,
+   "count": 24,
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 2,
+   "componentType": 5123,
+   "count": 36,
+   "type": "SCALAR"
+  }
+ ],
+ "extensionsUsed": [
+  "KHR_materials_pbrSpecularGlossiness",
+  "KHR_texture_basisu"
+ ]
+}
