@@ -55,22 +55,22 @@ export const PARAM_GROUPS = Object.freeze([
     params: [
       { key: 'upperArmLength', label: 'Panjang lengan atas', min: 0.18, max: 0.42, step: 0.005, default: 0.29, unit: 'm' },
       { key: 'forearmLength', label: 'Panjang lengan bawah', min: 0.16, max: 0.38, step: 0.005, default: 0.26, unit: 'm' },
-      { key: 'elbowRadius', label: 'Radius siku', min: 0.03, max: 0.09, step: 0.002, default: 0.052, unit: 'm' },
-      { key: 'wristRadius', label: 'Radius pergelangan', min: 0.02, max: 0.07, step: 0.002, default: 0.036, unit: 'm' },
-      { key: 'palmLength', label: 'Panjang telapak', min: 0.06, max: 0.15, step: 0.002, default: 0.095, unit: 'm' }
+      { key: 'elbowRadius', label: 'Radius siku', min: 0.03, max: 0.09, step: 0.001, default: 0.052, unit: 'm' },
+      { key: 'wristRadius', label: 'Radius pergelangan', min: 0.02, max: 0.07, step: 0.001, default: 0.036, unit: 'm' },
+      { key: 'palmLength', label: 'Panjang telapak', min: 0.06, max: 0.15, step: 0.001, default: 0.095, unit: 'm' }
     ]
   },
   {
     id: 'E',
     title: 'E · Tangan',
     params: [
-      { key: 'palmWidth', label: 'Lebar telapak', min: 0.05, max: 0.13, step: 0.002, default: 0.085, unit: 'm' },
+      { key: 'palmWidth', label: 'Lebar telapak', min: 0.05, max: 0.13, step: 0.001, default: 0.085, unit: 'm' },
       { key: 'fingerThickness', label: 'Ketebalan jari', min: 0.008, max: 0.024, step: 0.001, default: 0.014, unit: 'm' },
-      { key: 'fingerIndex', label: 'Panjang telunjuk', min: 0.04, max: 0.12, step: 0.002, default: 0.075, unit: 'm' },
-      { key: 'fingerMiddle', label: 'Panjang jari tengah', min: 0.04, max: 0.13, step: 0.002, default: 0.082, unit: 'm' },
-      { key: 'fingerRing', label: 'Panjang jari manis', min: 0.04, max: 0.12, step: 0.002, default: 0.075, unit: 'm' },
-      { key: 'fingerPinky', label: 'Panjang kelingking', min: 0.03, max: 0.1, step: 0.002, default: 0.058, unit: 'm' },
-      { key: 'thumbLength', label: 'Panjang ibu jari', min: 0.03, max: 0.1, step: 0.002, default: 0.062, unit: 'm' },
+      { key: 'fingerIndex', label: 'Panjang telunjuk', min: 0.04, max: 0.12, step: 0.001, default: 0.075, unit: 'm' },
+      { key: 'fingerMiddle', label: 'Panjang jari tengah', min: 0.04, max: 0.13, step: 0.001, default: 0.082, unit: 'm' },
+      { key: 'fingerRing', label: 'Panjang jari manis', min: 0.04, max: 0.12, step: 0.001, default: 0.075, unit: 'm' },
+      { key: 'fingerPinky', label: 'Panjang kelingking', min: 0.03, max: 0.1, step: 0.001, default: 0.058, unit: 'm' },
+      { key: 'thumbLength', label: 'Panjang ibu jari', min: 0.03, max: 0.1, step: 0.001, default: 0.062, unit: 'm' },
       { key: 'thumbAngle', label: 'Posisi ibu jari', min: 10, max: 80, step: 1, default: 45, unit: '°' }
     ]
   },
@@ -80,10 +80,10 @@ export const PARAM_GROUPS = Object.freeze([
     params: [
       { key: 'thighLength', label: 'Panjang paha', min: 0.28, max: 0.56, step: 0.005, default: 0.42, unit: 'm' },
       { key: 'calfLength', label: 'Panjang betis', min: 0.26, max: 0.54, step: 0.005, default: 0.4, unit: 'm' },
-      { key: 'kneeRadius', label: 'Radius lutut', min: 0.04, max: 0.1, step: 0.002, default: 0.062, unit: 'm' },
-      { key: 'ankleRadius', label: 'Radius pergelangan kaki', min: 0.02, max: 0.07, step: 0.002, default: 0.04, unit: 'm' },
+      { key: 'kneeRadius', label: 'Radius lutut', min: 0.04, max: 0.1, step: 0.001, default: 0.062, unit: 'm' },
+      { key: 'ankleRadius', label: 'Radius pergelangan kaki', min: 0.02, max: 0.07, step: 0.001, default: 0.04, unit: 'm' },
       { key: 'footLength', label: 'Panjang telapak kaki', min: 0.16, max: 0.34, step: 0.005, default: 0.24, unit: 'm' },
-      { key: 'footWidth', label: 'Lebar telapak kaki', min: 0.06, max: 0.16, step: 0.002, default: 0.1, unit: 'm' }
+      { key: 'footWidth', label: 'Lebar telapak kaki', min: 0.06, max: 0.16, step: 0.001, default: 0.1, unit: 'm' }
     ]
   }
 ]);
@@ -104,7 +104,7 @@ const PHASE_2_KEYS = new Set([
 ]);
 
 /** Fase pengembangan UI: 1 = sub-tahap 2a, 2 = sub-tahap 2b. */
-export const ACTIVE_PARAM_PHASE = 1;
+export const ACTIVE_PARAM_PHASE = 2;
 
 export function paramPhase(key) {
   return PHASE_2_KEYS.has(key) ? 2 : 1;

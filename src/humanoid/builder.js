@@ -138,7 +138,7 @@ function buildHand(side, params, s, material) {
     { y: -palmLength * 0.74, rx: palmWidth * 0.5, rz: palmThickness * 0.5 },
     { y: -palmLength * 0.32, rx: palmWidth * 0.48, rz: palmThickness * 0.5 },
     { y: -palmLength * 0.06, rx: palmWidth * 0.35, rz: palmThickness * 0.46 },
-    { y: 0, rx: palmWidth * 0.3, rz: palmThickness * 0.42 }
+    { y: 0, rx: palmWidth * 0.42, rz: palmThickness * 0.5 }
   ];
   const palmGeometry = loftGeometry(palmRings, 18);
   hand.add(makeMesh(`Palm_${side}`, palmGeometry, material, 'hand'));
@@ -309,20 +309,20 @@ export function buildHumanoid(inputParams = {}, pose = 'T') {
     arm.name = `Arm_${side}`;
     arm.position.set(sign * shoulderX, shoulderY, 0);
 
-    arm.add(makeMesh(`Joint_Shoulder_${side}`, sphereGeometry(shoulderRadius * 1.02), materials.skin, 'joint'));
+    arm.add(makeMesh(`Joint_Shoulder_${side}`, sphereGeometry(shoulderRadius), materials.skin, 'joint'));
     arm.add(makeMesh(`Arm_Upper_${side}`, limbGeometry(shoulderRadius, elbowRadius, upperArmLength), materials.skin, 'arm'));
 
     const elbow = new THREE.Group();
     elbow.name = `Elbow_${side}`;
     elbow.position.y = -upperArmLength;
-    elbow.add(makeMesh(`Joint_Elbow_${side}`, sphereGeometry(elbowRadius * 1.05), materials.skin, 'joint'));
-    elbow.add(makeMesh(`Arm_Lower_${side}`, limbGeometry(elbowRadius * 0.94, wristRadius, forearmLength), materials.skin, 'arm'));
+    elbow.add(makeMesh(`Joint_Elbow_${side}`, sphereGeometry(elbowRadius), materials.skin, 'joint'));
+    elbow.add(makeMesh(`Arm_Lower_${side}`, limbGeometry(elbowRadius * 0.98, wristRadius, forearmLength), materials.skin, 'arm'));
     arm.add(elbow);
 
     const wrist = new THREE.Group();
     wrist.name = `Wrist_${side}`;
     wrist.position.y = -forearmLength;
-    wrist.add(makeMesh(`Joint_Wrist_${side}`, sphereGeometry(wristRadius * 1.08), materials.skin, 'joint'));
+    wrist.add(makeMesh(`Joint_Wrist_${side}`, sphereGeometry(wristRadius), materials.skin, 'joint'));
     wrist.add(buildHand(side, params, s, materials.skin));
     elbow.add(wrist);
 
@@ -349,7 +349,7 @@ export function buildHumanoid(inputParams = {}, pose = 'T') {
     knee.name = `Knee_${side}`;
     knee.position.y = -thighLength;
     knee.add(makeMesh(`Joint_Knee_${side}`, sphereGeometry(kneeRadius), materials.pants, 'joint'));
-    knee.add(makeMesh(`Leg_Calf_${side}`, limbGeometry(kneeRadius * 0.96, ankleRadius, calfLength), materials.pants, 'leg'));
+    knee.add(makeMesh(`Leg_Calf_${side}`, limbGeometry(kneeRadius * 0.98, ankleRadius, calfLength), materials.pants, 'leg'));
     leg.add(knee);
 
     const ankle = new THREE.Group();

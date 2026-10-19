@@ -42,7 +42,7 @@ npm test                              # 17 tes unit Tahap 1
 node --test tests/humanoid-unit.test.mjs  # 12 tes unit humanoid
 node scripts/serve.mjs 4173 &         # setelah npm run build
 node tests/e2e-stage1.mjs             # 42 cek browser Tahap 1
-node tests/e2e-stage2a.mjs            # 10 cek browser humanoid 2a
+node tests/e2e-stage2.mjs             # 18 cek browser humanoid (2a+2b+2c)
 ```
 
 E2E menulis `../ucf-audit/stage1-e2e.json` dan `../ucf-audit/screenshots/*.png`
@@ -60,24 +60,32 @@ E2E menulis `../ucf-audit/stage1-e2e.json` dan `../ucf-audit/screenshots/*.png`
 cp ../humanoid-studio/public/models/XBot.glb test-assets/XBot.glb
 ```
 
-## Tahap 2a — humanoid prosedural
+## Tahap 2 — humanoid prosedural
 
 Seksi 5 di panel kanan membuat humanoid manekin dari geometri nyata (loft torso/kepala,
-silinder anggota badan, telapak hasil loft, jari 3 ruas + ibu jari 2 ruas). 21 parameter
-aktif pada sub-tahap ini: tinggi, lebar tubuh, skala kepala, panjang torso, pusat massa,
-enam ukuran kepala/leher, lima ukuran tubuh, dan lima ukuran lengan/kaki panjang.
+silinder anggota badan, telapak hasil loft, jari 3 ruas + ibu jari 2 ruas). **35 parameter**
+aktif dalam 6 grup:
 
-- Setiap slider memicu rebuild mesh; nilai dibaca ulang dari `params.js` (bukan sekadar
-  skala visual).
-- **Reset**, **Duplikat**, **Hapus**, ganti nama, T/A/netral, **Undo/Redo** (Ctrl+Z /
-  Ctrl+Shift+Z), serta **Simpan/Muat config** (JSON `ucf-character-config` v1.0) berfungsi.
-- Readout menampilkan tinggi aktual, jumlah mesh/verteks/segitiga, material, dan hash
-  geometri (FNV-1a) untuk membandingkan bentuk.
-- 14 parameter tangan/jari/lebar telapak-kaki menyusul di sub-tahap 2b.
+- **A Proporsi** (5): tinggi, lebar tubuh, skala kepala, panjang torso, pusat massa.
+- **B Kepala** (6): tinggi/lebar/kedalaman kepala, rahang, panjang & lebar leher.
+- **C Tubuh** (5): bahu, dada, ketebalan, pinggang, pinggul.
+- **D Lengan** (5): lengan atas, lengan bawah, radius siku, radius pergelangan, panjang telapak.
+- **E Tangan** (8): lebar telapak, ketebalan jari, panjang telunjuk/tengah/manis/kelingking,
+  panjang & posisi ibu jari.
+- **F Kaki** (6): paha, betis, radius lutut, radius pergelangan, panjang & lebar telapak kaki.
+
+Setiap slider memicu rebuild mesh; nilai dibaca ulang dari `params.js` (bukan sekadar skala
+visual). **Reset**, **Duplikat**, **Hapus**, ganti nama, pose T/A/netral, **Undo/Redo**
+(Ctrl+Z / Ctrl+Shift+Z), serta **Simpan/Muat config** (JSON `ucf-character-config` v1.0)
+berfungsi. Readout menampilkan tinggi aktual, jumlah mesh/verteks/segitiga, material, dan
+hash geometri (FNV-1a).
 
 ## Batasan saat ini (jangan diklaim lebih)
 
 - Humanoid belum punya **skeleton, weights, atau rigging**; Tahap 3 belum dikerjakan.
+- Bentuk manekin masih kasar (tanpa tekstur/wajah); kualitas visual belum final.
+- Nilai parameter 3 desimal; slider memakai langkah 0,001 m agar nilai default dapat
+  dikembalikan persis.
 - Belum ada modul pakaian, animasi/retargeting, maupun ekspor. Klip animasi hanya
   **dihitung**, belum diputar.
 - Hanya GLB/glTF. FBX/VRM ditolak dengan pesan eksplisit.

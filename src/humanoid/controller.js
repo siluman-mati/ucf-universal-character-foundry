@@ -430,7 +430,8 @@ export class HumanoidController {
     entry.pose = item.before.pose;
     this.rebuild(entry);
     this.pendingSnapshot.set(entry.modelId, this.snapshot(entry));
-    this.redoStack.push({ modelId: item.modelId, before: current, after: this.snapshot(entry) });
+    // redo harus mengembalikan keadaan SEBELUM undo (current), bukan keadaan setelah undo
+    this.redoStack.push({ modelId: item.modelId, before: this.snapshot(entry), after: current });
     this.selectedModelId = item.modelId;
     this.render();
     this.onSelect?.(item.modelId);
