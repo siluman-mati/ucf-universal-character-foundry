@@ -101,9 +101,37 @@
           </div>
         </section>
 
+        <section class="panel-section" id="humanoidSection">
+          <div class="section-head"><h2>5 · Humanoid prosedural</h2><span id="humanoidCount" class="count">0 karakter</span></div>
+          <div class="row-buttons wrap">
+            <button id="createHumanoid" class="btn primary" type="button">Buat humanoid</button>
+            <button id="duplicateHumanoid" class="btn" type="button" disabled>Duplikat</button>
+            <button id="deleteHumanoid" class="btn danger" type="button" disabled>Hapus</button>
+            <button id="resetHumanoid" class="btn" type="button" disabled>Reset</button>
+          </div>
+          <div class="row-buttons wrap">
+            <button id="undoHumanoid" class="btn" type="button" disabled title="Ctrl+Z">Undo</button>
+            <button id="redoHumanoid" class="btn" type="button" disabled title="Ctrl+Shift+Z">Redo</button>
+            <button id="saveCharacterConfig" class="btn" type="button" disabled>Simpan config</button>
+            <button id="loadCharacterConfig" class="btn" type="button">Muat config</button>
+            <input id="characterConfigFile" type="file" accept=".json,application/json" hidden />
+          </div>
+          <label class="field"><span>Nama karakter</span>
+            <input id="humanoidName" type="text" maxlength="48" placeholder="Humanoid" disabled />
+          </label>
+          <div class="pose-row" role="radiogroup" aria-label="Pose karakter">
+            <label class="check"><input type="radio" name="pose" value="T" checked disabled /> <span>T-pose</span></label>
+            <label class="check"><input type="radio" name="pose" value="A" disabled /> <span>A-pose</span></label>
+            <label class="check"><input type="radio" name="pose" value="netral" disabled /> <span>Netral</span></label>
+          </div>
+          <p id="humanoidHint" class="hint">Buat humanoid untuk mengaktifkan parameter. Setiap parameter mengubah geometri 3D nyata, bukan sekadar tampilan.</p>
+          <div id="humanoidParams" class="param-groups hidden"></div>
+          <div id="humanoidReadout" class="humanoid-readout hidden"></div>
+        </section>
+
         <section class="panel-section grow">
           <div class="section-head">
-            <h2>5 · Status validasi</h2>
+            <h2>6 · Status validasi</h2>
             <span id="validationSummary" class="count">—</span>
           </div>
           <div id="validationList" class="validation-list" aria-live="polite"></div>
@@ -113,9 +141,10 @@
         <section class="panel-section">
           <div class="section-head"><h2>Batasan tahap ini</h2></div>
           <p class="hint">
-            Tahap 1 mencakup viewport, kamera, helper, hierarki, dan impor GLB/glTF.
-            Belum aktif: humanoid prosedural, rigging/skinning, modul pakaian, animasi/retargeting, ekspor.
-            Tombol untuk fitur yang belum ada sengaja tidak dibuat.
+            Tahap 2a mencakup pembuatan humanoid prosedural, 21 parameter inti (proporsi, kepala, tubuh,
+            panjang lengan/kaki), reset, duplikat, undo/redo, serta simpan/muat config.
+            Menyusul di 2b: 14 parameter tangan dan kaki. Belum aktif: rigging/skinning, modul pakaian,
+            animasi/retargeting, ekspor. Tombol untuk fitur yang belum ada sengaja tidak dibuat.
           </p>
         </section>
       </aside>

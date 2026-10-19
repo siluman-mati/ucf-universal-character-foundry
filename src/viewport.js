@@ -104,12 +104,12 @@ export class Viewport {
   }
 
   _addLights() {
-    const hemisphere = new THREE.HemisphereLight(0xdbeafe, 0x0f172a, 1.35);
-    const key = new THREE.DirectionalLight(0xffffff, 2.4);
+    const hemisphere = new THREE.HemisphereLight(0xdbeafe, 0x0f172a, 0.95);
+    const key = new THREE.DirectionalLight(0xffffff, 1.85);
     key.position.set(4, 6, 5);
-    const fill = new THREE.DirectionalLight(0x93c5fd, 0.85);
+    const fill = new THREE.DirectionalLight(0x93c5fd, 0.5);
     fill.position.set(-5, 3, -4);
-    const rim = new THREE.DirectionalLight(0xfde68a, 0.45);
+    const rim = new THREE.DirectionalLight(0xfde68a, 0.3);
     rim.position.set(0, 4, -6);
     for (const light of [hemisphere, key, fill, rim]) light.userData.ucfHelper = true;
     this.scene.add(hemisphere, key, fill, rim);
@@ -321,6 +321,67 @@ export class Viewport {
     this.applyWireframeToModel(model);
     this.options.onModelsChanged?.(this.models);
     return model;
+  }
+
+  /** Raycast untuk pengujian: kembalikan objek terdekat di koordinat layar. */
+  pickAt(clientX, clientY) {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const ndc = new THREE.Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1
+    );
+    this.raycaster.setFromCamera(ndc, this.camera);
+    const hits = this.raycaster.intersectObjects(this.modelRoot.children, true);
+    if (!hits.length) return null;
+    const hit = hits[0];
+    const names = [];
+    let node = hit.object;
+    while (node) { if (node.name) names.push(node.name); node = node.parent; }
+    return { name: hit.object.name, type: hit.object.type, point: hit.point.toArray(), path: names, distance: hit.distance };
+  }
+
+  modelById(id) {
+    return this.models.find((model) => model.id === id) || null;
+  }
+
+  /** Hitung ulang bbox & helper setelah transform/geometri berubah. */
+  refreshModel(id) {
+    const model = this.modelById(id);
+    if (!model) return false;
+    model.root.updateMatrixWorld(true);
+    model.bbox.setFromObject(model.root);
+    model.bboxHelper.box.copy(model.bbox);
+    model.bboxHelper.updateMatrixWorld(true);
+    this.options.onModelsChanged?.(this.models);
+    return true;
+  }
+
+  /** Ganti isi model tanpa mengubah posisi root (dipakai rebuild humanoid). */
+  replaceContent(id, content, stats = null) {
+    const model = this.modelById(id);
+    if (!model) return false;
+    for (const child of [...model.root.children]) {
+      model.root.remove(child);
+      this._disposeObject(child);
+    }
+    model.root.add(content);
+    model.root.updateMatrixWorld(true);
+    model.bbox.setFromObject(model.root);
+    model.bboxHelper.box.copy(model.bbox);
+    model.bboxHelper.updateMatrixWorld(true);
+    if (stats) model.stats = stats;
+    this.applyWireframeToModel(model);
+    this.options.onModelsChanged?.(this.models);
+    return true;
+  }
+
+  renameModel(id, name) {
+    const model = this.modelById(id);
+    if (!model) return false;
+    model.name = name;
+    model.root.name = name;
+    this.options.onModelsChanged?.(this.models);
+    return true;
   }
 
   removeModel(id) {

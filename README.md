@@ -38,9 +38,11 @@ di sesi baru. Browser untuk Playwright juga perlu dipasang ulang:
 ## Tes
 
 ```bash
-npm test                     # 17 tes unit (node:test)
-node scripts/serve.mjs 4173 &  # setelah npm run build
-node tests/e2e-stage1.mjs      # 42 cek browser + tangkapan layar
+npm test                              # 17 tes unit Tahap 1
+node --test tests/humanoid-unit.test.mjs  # 12 tes unit humanoid
+node scripts/serve.mjs 4173 &         # setelah npm run build
+node tests/e2e-stage1.mjs             # 42 cek browser Tahap 1
+node tests/e2e-stage2a.mjs            # 10 cek browser humanoid 2a
 ```
 
 E2E menulis `../ucf-audit/stage1-e2e.json` dan `../ucf-audit/screenshots/*.png`
@@ -58,10 +60,26 @@ E2E menulis `../ucf-audit/stage1-e2e.json` dan `../ucf-audit/screenshots/*.png`
 cp ../humanoid-studio/public/models/XBot.glb test-assets/XBot.glb
 ```
 
-## Batasan Tahap 1 (jangan diklaim lebih)
+## Tahap 2a — humanoid prosedural
 
-- Belum ada humanoid prosedural, rigging/skinning, modul pakaian, animasi/retargeting,
-  maupun ekspor. Klip animasi hanya **dihitung**, belum diputar.
+Seksi 5 di panel kanan membuat humanoid manekin dari geometri nyata (loft torso/kepala,
+silinder anggota badan, telapak hasil loft, jari 3 ruas + ibu jari 2 ruas). 21 parameter
+aktif pada sub-tahap ini: tinggi, lebar tubuh, skala kepala, panjang torso, pusat massa,
+enam ukuran kepala/leher, lima ukuran tubuh, dan lima ukuran lengan/kaki panjang.
+
+- Setiap slider memicu rebuild mesh; nilai dibaca ulang dari `params.js` (bukan sekadar
+  skala visual).
+- **Reset**, **Duplikat**, **Hapus**, ganti nama, T/A/netral, **Undo/Redo** (Ctrl+Z /
+  Ctrl+Shift+Z), serta **Simpan/Muat config** (JSON `ucf-character-config` v1.0) berfungsi.
+- Readout menampilkan tinggi aktual, jumlah mesh/verteks/segitiga, material, dan hash
+  geometri (FNV-1a) untuk membandingkan bentuk.
+- 14 parameter tangan/jari/lebar telapak-kaki menyusul di sub-tahap 2b.
+
+## Batasan saat ini (jangan diklaim lebih)
+
+- Humanoid belum punya **skeleton, weights, atau rigging**; Tahap 3 belum dikerjakan.
+- Belum ada modul pakaian, animasi/retargeting, maupun ekspor. Klip animasi hanya
+  **dihitung**, belum diputar.
 - Hanya GLB/glTF. FBX/VRM ditolak dengan pesan eksplisit.
 - Draco dan KTX2/Basis Universal belum didukung → impor **BLOCKED** dengan alasan.
   Material `KHR_materials_pbrSpecularGlossiness` dilaporkan sebagai peringatan.

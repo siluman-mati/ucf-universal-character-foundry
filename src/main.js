@@ -7,6 +7,7 @@ import { Viewport } from './viewport.js';
 import { importModelFile, ImportError } from './importer.js';
 import { renderHierarchy, filterHierarchy, markSelected, objectDetails } from './hierarchy.js';
 import { ValidationLog, RESULT } from './validation.js';
+import { HumanoidController } from './humanoid/controller.js';
 import { VIEW_ORDER, directionErrorDegrees } from './camera.js';
 import { formatNumber } from './format.js';
 
@@ -57,6 +58,7 @@ const state = {
 };
 let booted = false;
 let pendingViewsRecord = false;
+let humanoid = null;
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -80,6 +82,17 @@ const viewport = new Viewport(ui.viewport, {
   onSelect: (object) => handleViewportSelect(object),
   onModelsChanged: (models) => handleModelsChanged(models),
   onCameraSettled: (camera) => handleCameraSettled(camera)
+});
+
+humanoid = new HumanoidController({
+  viewport,
+  log,
+  onSelect: (modelId) => selectModelById(modelId),
+  onChanged: () => {
+    renderModelList();
+    updateRenderInfo();
+  },
+  status: setStatus
 });
 
 /* ------------------------------------------------------------------ */
@@ -242,8 +255,33 @@ function modelIdForObject(object) {
   return null;
 }
 
+function isObjectAttached(object) {
+  let node = object;
+  while (node) {
+    if (node === viewport.modelRoot) return true;
+    node = node.parent;
+  }
+  return false;
+}
+
+function selectModelById(modelId) {
+  if (!modelId) {
+    handleViewportSelect(null);
+    return;
+  }
+  const model = viewport.modelById(modelId);
+  if (model) handleViewportSelect(model.root);
+}
+
 function handleModelsChanged(models) {
   state.models = [...models];
+  humanoid?.syncModels(models);
+  if (state.selectedObject && !isObjectAttached(state.selectedObject)) {
+    state.selectedObject = null;
+    state.selectedModelId = null;
+    viewport.selectObject(null);
+    ui.nodeInfo.innerHTML = '<p class="muted">Tidak ada node terpilih.</p>';
+  }
   if (state.selectedModelId && !models.some((model) => model.id === state.selectedModelId)) {
     state.selectedObject = null;
     state.selectedModelId = null;
@@ -319,6 +357,7 @@ function handleViewportSelect(object) {
     for (const row of ui.hierarchyTree.querySelectorAll('.tree-row.selected')) row.classList.remove('selected');
     ui.nodeInfo.innerHTML = '<p class="muted">Tidak ada node terpilih.</p>';
   }
+  humanoid?.setSelection(object ? modelIdForObject(object) : null);
 }
 
 function renderNodeInfo(object) {
@@ -580,6 +619,7 @@ ui.deleteSelected.addEventListener('click', () => {
 
 ui.clearAll.addEventListener('click', () => {
   const before = viewport.models.length;
+  humanoid?.clearAll();
   viewport.clearModels();
   state.selectedObject = null;
   state.selectedModelId = null;
@@ -722,6 +762,14 @@ window.addEventListener('keydown', (event) => {
 /* ------------------------------------------------------------------ */
 
 window.addEventListener('keydown', (event) => {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
+    const tag = event.target?.tagName;
+    if (tag === 'TEXTAREA' || (tag === 'INPUT' && event.target.type === 'text')) return;
+    event.preventDefault();
+    if (event.shiftKey) humanoid?.redo();
+    else humanoid?.undo();
+    return;
+  }
   const tag = event.target?.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
   const views = { 1: 'depan', 2: 'belakang', 3: 'kiri', 4: 'kanan', 5: 'atas', 6: 'perspektif' };
@@ -869,8 +917,14 @@ window.__ucf = {
     const vector = new THREE.Vector3(point[0], point[1], point[2]).project(viewport.camera);
     return [vector.x, vector.y, vector.z];
   },
+  pickAt(clientX, clientY) {
+    return viewport.pickAt(clientX, clientY);
+  },
   environment() {
     return environmentInfo();
+  },
+  get humanoid() {
+    return humanoid;
   },
   // Untuk pengukuran/pengujian lanjutan; bukan API publik aplikasi.
   get scene() {
