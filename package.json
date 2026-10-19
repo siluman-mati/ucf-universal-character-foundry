@@ -10,8 +10,8 @@
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
     "serve": "node scripts/serve.mjs",
-    "test": "node --test tests/unit.test.mjs tests/humanoid-unit.test.mjs tests/humanoid-rig.test.mjs",
-    "test:e2e": "node tests/e2e-stage1.mjs && node tests/e2e-stage2.mjs && node tests/e2e-stage3.mjs"
+    "test": "node --test tests/unit.test.mjs tests/humanoid-unit.test.mjs tests/humanoid-rig.test.mjs tests/modular-unit.test.mjs",
+    "test:e2e": "node tests/e2e-stage1.mjs && node tests/e2e-stage2.mjs && node tests/e2e-stage3.mjs && node tests/e2e-stage4.mjs"
   },
   "dependencies": {
     "three": "0.180.0"

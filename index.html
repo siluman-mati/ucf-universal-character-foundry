@@ -4,8 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="color-scheme" content="dark" />
-  <meta name="description" content="Universal Character Foundry v1.1 — Tahap 3: viewport 3D, humanoid prosedural, dan rigging sampai ruas jari." />
-  <title>Universal Character Foundry — Tahap 3</title>
+  <meta name="description" content="Universal Character Foundry v1.1 — Tahap 4: viewport 3D, humanoid prosedural, rigging, dan sistem modul karakter." />
+  <title>Universal Character Foundry — Tahap 4</title>
   <link rel="stylesheet" href="./src/styles.css" />
 </head>
 <body>
@@ -15,7 +15,7 @@
         <div class="brand-mark" aria-hidden="true">UCF</div>
         <div class="brand-text">
           <strong>Universal Character Foundry</strong>
-          <span>v1.1 · Tahap 3 — rigging &amp; skin</span>
+          <span>v1.1 · Tahap 4 — modul karakter</span>
         </div>
       </div>
       <div class="topbar-actions">
@@ -151,9 +151,31 @@
           <div id="boneInfo" class="hint">Buat humanoid untuk memeriksa skeleton dan skin weights.</div>
         </section>
 
+        <section class="panel-section" id="modularSection">
+          <div class="section-head"><h2>7 · Modul karakter</h2><span id="moduleCount" class="count">0 modul</span></div>
+          <p class="hint">
+            Modul prosedural dipasang ke rig humanoid yang sama. Setiap pemasangan diperiksa ulang:
+            skala, orientasi, posisi, proporsi, skeleton, bobot, material, dan clipping.
+            Status <b>UNKNOWN</b> / <b>NEEDS VALIDATION</b> berarti belum terbukti aman.
+          </p>
+          <div class="module-toolbar">
+            <input id="moduleSearch" type="search" placeholder="Cari modul…" autocomplete="off" />
+            <select id="moduleCategory" class="select" aria-label="Kategori modul"></select>
+          </div>
+          <div id="moduleLibrary" class="module-library" aria-live="polite"></div>
+          <div class="row-buttons wrap">
+            <button id="importModule" class="btn" type="button">Impor manifest modul</button>
+            <input id="moduleFile" type="file" accept=".json,application/json" hidden />
+          </div>
+          <div id="moduleReport" class="hint module-report"></div>
+          <h3 class="subhead">Modul terpasang</h3>
+          <div id="moduleAttached" class="module-attached"></div>
+          <div id="moduleCompat" class="module-compat"></div>
+        </section>
+
         <section class="panel-section grow">
           <div class="section-head">
-            <h2>7 · Status validasi</h2>
+            <h2>8 · Status validasi</h2>
             <span id="validationSummary" class="count">—</span>
           </div>
           <div id="validationList" class="validation-list" aria-live="polite"></div>
@@ -163,10 +185,10 @@
         <section class="panel-section">
           <div class="section-head"><h2>Batasan tahap ini</h2></div>
           <p class="hint">
-            Tahap 3 mencakup 35 parameter humanoid, skeleton 51 tulang sampai ruas jari, skin weights
-            yang terhitung, uji rotasi sendi, reset pose, serta pemeriksaan deformasi &amp; bobot.
-            Belum aktif: modul pakaian, animasi/retargeting, ekspor. Tombol untuk fitur yang belum ada
-            sengaja tidak dibuat.
+            Tahap 4 mencakup 35 parameter humanoid, skeleton 51 tulang, skin weights teruji,
+            serta sistem modul (body, skin, wajah, rambut, atasan, bawahan, alas kaki, aksesori)
+            dengan pemeriksaan kompatibilitas dan clipping. Belum aktif: animasi/retargeting dan
+            ekspor. Tombol untuk fitur yang belum ada sengaja tidak dibuat.
           </p>
         </section>
       </aside>

@@ -319,6 +319,46 @@ export function rigify(content, { params, s, pose = 'T' } = {}) {
   return rig;
 }
 
+/**
+ * Beri skin weights pada geometri modul memakai tulang rig yang sudah ada.
+ * Geometri harus berada di ruang lokal `rig.root` (ruang bind).
+ * Tidak menambah tulang dan tidak mengubah bobot mesh badan.
+ */
+export function skinGeometryForRig(geometry, candidateNames, rig) {
+  rig.root.updateMatrixWorld(true);
+  const inverse = rig.root.matrixWorld.clone().invert();
+  const indexByName = new Map(rig.list.map((bone, index) => [bone.name, index]));
+  const segments = rig.list.map((bone) => {
+    const start = bone.getWorldPosition(new THREE.Vector3()).applyMatrix4(inverse);
+    let end;
+    const boneChild = bone.children.find((child) => child.isBone);
+    if (boneChild) {
+      end = boneChild.getWorldPosition(new THREE.Vector3()).applyMatrix4(inverse);
+    } else {
+      const parent = bone.parent;
+      const direction = parent?.isBone
+        ? start.clone().sub(parent.getWorldPosition(new THREE.Vector3()).applyMatrix4(inverse))
+        : new THREE.Vector3(0, 1, 0);
+      if (direction.lengthSq() < 1e-10) direction.set(0, 1, 0);
+      end = start.clone().addScaledVector(direction.normalize(), 0.035);
+    }
+    return { index: indexByName.get(bone.name), name: bone.name, start, end };
+  });
+
+  const skin = computeSkin(geometry, candidateNames, segments, indexByName);
+  geometry.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(skin.skinIndex, 4));
+  geometry.setAttribute('skinWeight', new THREE.Float32BufferAttribute(skin.skinWeight, 4));
+  return skin.stats;
+}
+
+/** Posisi tulang dalam ruang lokal rig.root (ruang bind), untuk menyusun modul. */
+export function boneLocalPosition(rig, name) {
+  rig.root.updateMatrixWorld(true);
+  const bone = rig.bones.get(name);
+  if (!bone) return null;
+  return rig.root.worldToLocal(bone.getWorldPosition(new THREE.Vector3()));
+}
+
 /** Kembalikan rotasi semua tulang ke nol. */
 export function resetBones(rig) {
   for (const bone of rig.list) bone.rotation.set(0, 0, 0);

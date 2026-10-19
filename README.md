@@ -1,9 +1,11 @@
-# Universal Character Foundry (UCF) v1.1 — Tahap 3
+# Universal Character Foundry (UCF) v1.1 — Tahap 4
 
 Aplikasi web mandiri untuk pembuatan karakter 3D. **Tahap 1** mencakup viewport 3D,
 kontrol kamera, helper tampilan, hierarki objek, dan impor GLB/glTF; **Tahap 2** menambah
 humanoid prosedural 35 parameter; **Tahap 3** menambah skeleton 51 tulang sampai ruas jari,
-skin weights, dan pengujian deformasi. Proyek terpisah dari rigPro A.0 dan tidak mengubahnya.
+skin weights, dan pengujian deformasi; **Tahap 4** menambah sistem modular karakter
+(library 18 modul, validasi kompatibilitas 13 pemeriksaan, pasang/lepas/ganti, material,
+visibilitas, dan simpan/muat config). Proyek terpisah dari rigPro A.0 dan tidak mengubahnya.
 
 ## Yang sudah berfungsi pada tahap ini
 
@@ -39,11 +41,12 @@ di sesi baru. Browser untuk Playwright juga perlu dipasang ulang:
 ## Tes
 
 ```bash
-npm test                              # 37 tes unit (17 viewport/impor + 12 humanoid + 8 rig)
+npm test                              # 52 tes unit (17 viewport/impor + 12 humanoid + 8 rig + 15 modular)
 node scripts/serve.mjs 4173 &         # setelah npm run build
 node tests/e2e-stage1.mjs             # 42 cek browser Tahap 1
 node tests/e2e-stage2.mjs             # 18 cek browser humanoid (2a+2b+2c)
 node tests/e2e-stage3.mjs             # 15 cek browser rigging & deformasi
+node tests/e2e-stage4.mjs             # 21 cek browser sistem modular
 ```
 
 E2E menulis `../ucf-audit/stage1-e2e.json` dan `../ucf-audit/screenshots/*.png`
@@ -100,6 +103,32 @@ Seksi 6 di panel kanan menampilkan dan menguji rig karakter terpilih.
 - Pose T/A/netral diterapkan lewat rotasi tulang, bukan membangun ulang geometri;
   bind pose selalu T. Simpan/muat config mempertahankan rig, pose, dan bentuk.
 
+## Tahap 4 — sistem modular karakter
+
+Seksi 7 di panel kanan menyimpan library modul dan daftar modul terpasang.
+
+- **18 modul bawaan** (1 base body + 17 dapat dipasang) pada 8 kategori: `body`, `skin`,
+  `face`, `hair`, `tops`, `bottoms`, `shoes`, `accessories`. Tipe attachment: `base`,
+  `skinned` (kaos, jaket, celana, rok, sarung tangan), `bone` (rambut, topi, kacamata,
+  sabuk, sepatu, sandal, wajah), `static` (tas punggung), dan `material` (skin).
+- **Metadata 19 field** per modul (18 field prompt + `moduleVersion`) divalidasi sebelum
+  dipasang; manifest yang kurang field ditolak dengan daftar field yang hilang.
+- **13 pemeriksaan kompatibilitas**: metadata, profil body (`ucf-procedural-35`), skeleton
+  (`ucf-humanoid-51`), tulang wajib, titik pasang, area tubuh, skala, proporsi, posisi,
+  orientasi (determinan matriks), skin weights, material, dan clipping. Nama tulang yang
+  sama saja tidak cukup — skeleton ID, tulang wajib, area, dan geometri ikut diukur.
+- Modul **skinned** memakai `skinGeometryForRig()` sehingga menumpang `Skeleton` body
+  (tidak menambah tulang); modul **bone** digantung pada tulang target; modul **static**
+  ditempatkan pada ruang root. Hasil uji: body tetap 53 mesh / 51 tulang, beratap 4 pengaruh.
+- **Operasi UI**: cari/filter kategori, **Pasang**, **Pratinjau** (render thumbnail 96 px),
+  **Lepas**, **Hapus**, ganti modul dalam kategori yang sama, rename, ubah warna material,
+  checkbox visibilitas, dan impor manifest JSON. Setiap aksi masuk log validasi grup D.
+- **Status jujur**: `VALID` hanya bila seluruh pemeriksaan PASS; `NEEDS VALIDATION` untuk
+  modul yang tidak dapat memverifikasi clipping (mis. `wajah-dasar`) atau modul hasil impor.
+- **Config** menyimpan `modules[]`: instanceId, moduleId, nama, kategori, tipe attachment,
+  visibilitas, material, transform, status validasi, metadata sumber, dan manifest impor.
+  Muat config memasang ulang modul melalui `reattachAll()`.
+
 ## Batasan saat ini (jangan diklaim lebih)
 
 - Bentuk manekin masih kasar (tanpa tekstur/wajah, tanpa rig wajah); kualitas visual belum final
@@ -110,8 +139,14 @@ Seksi 6 di panel kanan menampilkan dan menguji rig karakter terpilih.
   pengujian animasi/klip (Tahap 5).
 - Nilai parameter 3 desimal; slider memakai langkah 0,001 m agar nilai default dapat
   dikembalikan persis.
-- Belum ada modul pakaian, animasi/retargeting, maupun ekspor. Klip animasi hanya
-  **dihitung**, belum diputar.
+- Modul pakaian/aksesori masih prosedural tanpa tekstur; belum ada simulasi kain,
+  rig wajah, atau morph target. Modul impor hanya boleh menunjuk generator prosedural UCF —
+  berkas GLB/VRM pakaian eksternal belum didukung.
+- Clipping diperiksa dengan sampling verteks terhadap mesh body (ambang 2% PASS / 20% WARN);
+  ini heuristik, bukan jaminan bebas penetrasi di semua pose.
+- Satu slot untuk `skin/face/hair/tops/bottoms/shoes`; aksesori boleh lebih dari satu.
+  Transform modul hanya untuk tipe `bone`/`static`, bukan `skinned`.
+- Belum ada animasi/retargeting maupun ekspor. Klip animasi hanya **dihitung**, belum diputar.
 - Hanya GLB/glTF. FBX/VRM ditolak dengan pesan eksplisit.
 - Draco dan KTX2/Basis Universal belum didukung → impor **BLOCKED** dengan alasan.
   Material `KHR_materials_pbrSpecularGlossiness` dilaporkan sebagai peringatan.

@@ -13,8 +13,8 @@ export function sanitizeCharacterName(value, fallback = 'Humanoid') {
   return name || fallback;
 }
 
-export function characterToConfig(entry, model) {
-  return {
+export function characterToConfig(entry, model, modular = null) {
+  const config = {
     id: entry.id,
     name: entry.name,
     pose: entry.pose,
@@ -25,6 +25,56 @@ export function characterToConfig(entry, model) {
       scale: model ? model.root.scale.x : 1
     }
   };
+  if (modular && Array.isArray(modular.modules)) {
+    config.modules = modular.modules.map((module) => ({
+      instanceId: typeof module.instanceId === 'string' ? module.instanceId : 'ml-?',
+      moduleId: String(module.moduleId || ''),
+      name: typeof module.name === 'string' ? module.name.slice(0, 48) : module.moduleId,
+      category: module.category,
+      attachmentType: module.attachmentType,
+      visible: module.visible !== false,
+      material: module.material && typeof module.material === 'object' ? { ...module.material } : {},
+      transform: module.transform || { scale: 1, offset: [0, 0, 0] },
+      validationStatus: module.validationStatus || 'UNKNOWN',
+      metadata: module.metadata || {},
+      manifest: module.manifest || null
+    }));
+  }
+  return config;
+}
+
+function sanitizeModules(raw, name, warnings) {
+  if (raw === undefined) return [];
+  if (!Array.isArray(raw)) {
+    warnings.push(`${name}: field modules bukan array; diabaikan.`);
+    return [];
+  }
+  const modules = [];
+  raw.forEach((item, index) => {
+    if (!item || typeof item !== 'object' || typeof item.moduleId !== 'string' || !item.moduleId) {
+      warnings.push(`${name}: entri modul #${index + 1} tidak valid dan dilewati.`);
+      return;
+    }
+    modules.push({
+      instanceId: typeof item.instanceId === 'string' ? item.instanceId : `ml-restore-${index + 1}`,
+      moduleId: item.moduleId,
+      name: typeof item.name === 'string' ? item.name.slice(0, 48) : item.moduleId,
+      category: item.category || null,
+      attachmentType: item.attachmentType || null,
+      visible: item.visible !== false,
+      material: item.material && typeof item.material === 'object' ? { ...item.material } : {},
+      transform: item.transform && typeof item.transform === 'object'
+        ? {
+          scale: Number.isFinite(Number(item.transform.scale)) ? Number(item.transform.scale) : 1,
+          offset: Array.isArray(item.transform.offset) ? item.transform.offset.slice(0, 3).map(Number) : [0, 0, 0]
+        }
+        : { scale: 1, offset: [0, 0, 0] },
+      validationStatus: item.validationStatus || 'UNKNOWN',
+      metadata: item.metadata && typeof item.metadata === 'object' ? { ...item.metadata } : {},
+      manifest: item.manifest && typeof item.manifest === 'object' ? { ...item.manifest } : null
+    });
+  });
+  return modules;
 }
 
 export function exportConfig(characters, { savedAt = new Date().toISOString() } = {}) {
@@ -91,7 +141,8 @@ export function parseConfig(input) {
       name,
       pose,
       params,
-      transform: { position, rotationY, scale }
+      transform: { position, rotationY, scale },
+      modules: sanitizeModules(raw?.modules, name, warnings)
     };
   });
 

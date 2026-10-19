@@ -16,6 +16,8 @@ import {
 } from './params.js';
 import { objectSignature } from './signature.js';
 import { measureDeformation, applyPose } from './rig.js';
+import { ModularManager, BASE_MODULE_ID } from '../modular/manager.js';
+import { ModularPanel } from '../modular/ui.js';
 import { exportConfig, parseConfig, sanitizeCharacterName, characterToConfig } from './config.js';
 import { summarize } from '../stats.js';
 import { RESULT } from '../validation.js';
@@ -42,6 +44,15 @@ export class HumanoidController {
     this.selectedBone = null;
     this.rigToggles = { skeleton: false, names: false };
     this.rigHelpers = new Map();
+
+    this.modular = new ModularManager({
+      onChange: (entry) => this.onModularChange(entry)
+    });
+    this.modulePanel = new ModularPanel({
+      controller: this,
+      manager: this.modular,
+      status: (message, level) => this.status?.(message, level)
+    });
 
     this.dom = {
       create: document.querySelector('#createHumanoid'),
@@ -267,6 +278,7 @@ export class HumanoidController {
 
     this.updateReadout(entry);
     this.renderRig();
+    this.modulePanel?.render();
   }
 
   updateReadout(entry) {
@@ -282,6 +294,119 @@ export class HumanoidController {
         <span>Material</span><b>${signature.materials}</b>
         <span>Hash geometri</span><b title="${signature.geometryHash}">${signature.geometryHash.slice(0, 8)}</b>
       </div>`;
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* modular (Tahap 4)                                                 */
+  /* ---------------------------------------------------------------- */
+
+  recordModule(test, result, details = {}, warnings = []) {
+    this.log?.add({
+      group: 'D. Modular',
+      test,
+      model: this.current()?.name || '—',
+      result,
+      warnings: Array.isArray(warnings) ? warnings : [],
+      errors: result === RESULT.FAIL ? [details.alasan || 'modul ditolak'] : [],
+      details
+    });
+  }
+
+  onModularChange(entry) {
+    if (!entry?.content) return;
+    const model = this.viewport.modelById(entry.modelId);
+    if (model) {
+      model.stats = summarize(entry.content);
+      this.viewport.refreshModel(entry.modelId);
+    }
+    this.modulePanel?.render();
+    this.renderRig();
+    this.onChanged?.();
+  }
+
+  moduleState() {
+    const entry = this.current();
+    if (!entry) return { attached: [], library: [], summary: null, selected: null };
+    const attached = this.modular.attached(entry)
+      .filter((instance) => instance.moduleId !== BASE_MODULE_ID)
+      .map((instance) => ({
+        instanceId: instance.instanceId,
+        moduleId: instance.moduleId,
+        name: instance.name,
+        category: instance.category,
+        attachmentType: instance.attachmentType,
+        visible: instance.visible,
+        meshCount: instance.meshes.length,
+        overrides: { ...instance.overrides },
+        status: instance.compat?.status || 'UNKNOWN',
+        checks: instance.compat?.checks || [],
+        warnings: instance.compat?.warnings || []
+      }));
+    return {
+      attached,
+      summary: this.modular.summary(entry),
+      selected: this.modulePanel?.selectedInstanceId || null,
+      library: this.modular.listLibrary(entry, { search: '', category: 'all' }).map(({ module, attached: isAttached }) => ({
+        moduleId: module.moduleId,
+        moduleName: module.moduleName,
+        category: module.category,
+        attachmentType: module.attachmentType,
+        validationStatus: module.validationStatus,
+        sourceFormat: module.sourceFormat,
+        sourceLicense: module.sourceLicense,
+        requiredBones: [...module.requiredBones],
+        attached: isAttached,
+        imported: Boolean(module.imported)
+      }))
+    };
+  }
+
+  attachModule(moduleId) {
+    return this.modulePanel?.attach(moduleId) || null;
+  }
+
+  detachModule(instanceId) {
+    return this.modulePanel?.detachInstance(instanceId) || false;
+  }
+
+  replaceModule(instanceId) {
+    return this.modulePanel?.replaceInstance(instanceId) || false;
+  }
+
+  deleteModule(instanceId) {
+    return this.modulePanel?.deleteInstance(instanceId) || false;
+  }
+
+  renameModule(instanceId, name) {
+    const entry = this.current();
+    if (!entry) return false;
+    const ok = this.modular.rename(entry, instanceId, name);
+    this.modulePanel?.render();
+    return ok;
+  }
+
+  setModuleMaterial(instanceId, values) {
+    const entry = this.current();
+    if (!entry) return false;
+    const ok = this.modular.setMaterial(entry, instanceId, values);
+    this.modulePanel?.render();
+    return ok;
+  }
+
+  setModuleVisible(instanceId, visible) {
+    const entry = this.current();
+    if (!entry) return false;
+    const ok = this.modular.setVisible(entry, instanceId, visible);
+    this.modulePanel?.render();
+    return ok;
+  }
+
+  importModuleManifest(text) {
+    return this.modulePanel?.importManifest(text, 'manifest') || null;
+  }
+
+  previewModule(moduleId) {
+    return this.modulePanel?.preview(moduleId) || null;
   }
 
   /* ---------------------------------------------------------------- */
@@ -574,6 +699,7 @@ export class HumanoidController {
     }
 
     this.ensureRigHelpers(entry);
+    this.modulePanel?.render();
     this.render();
     if (select) this.onSelect?.(model.id);
     this.onChanged?.();
@@ -588,6 +714,10 @@ export class HumanoidController {
     entry.content = built.content;
     const stats = summarize(built.content);
     this.viewport.replaceContent(entry.modelId, built.content, stats);
+    const reattached = this.modular.reattachAll(entry);
+    if (reattached.failed) {
+      this.status?.(`${reattached.failed} modul gagal dipasang ulang setelah perubahan parameter.`, 'error');
+    }
     this.ensureRigHelpers(entry);
     if (this.selectedModelId === entry.modelId) this.onSelect?.(entry.modelId);
     this.render();
@@ -685,6 +815,12 @@ export class HumanoidController {
       pose: entry.pose
     });
     const copySignature = objectSignature(copy.content, { world: false });
+    const modules = this.modular.serialize(entry).modules;
+    if (modules.length) {
+      const restored = this.modular.restore(copy, modules);
+      if (restored.warnings.length) this.status?.(restored.warnings.join(' '), 'warn');
+      this.modulePanel?.render();
+    }
     const same = original?.geometryHash === copySignature?.geometryHash;
     this.record('Duplikasi karakter', same ? RESULT.PASS : RESULT.FAIL, {
       asal: entry.name,
@@ -699,6 +835,7 @@ export class HumanoidController {
     const entry = this.current();
     if (!entry) return false;
     const name = entry.name;
+    this.modular.clear(entry);
     this.disposeRigHelpers(entry);
     this.viewport.removeModel(entry.modelId);
     this.entries.delete(entry.modelId);
@@ -775,7 +912,10 @@ export class HumanoidController {
   }
 
   clearAll() {
-    for (const entry of [...this.entries.values()]) this.disposeRigHelpers(entry);
+    for (const entry of [...this.entries.values()]) {
+      this.modular.clear(entry);
+      this.disposeRigHelpers(entry);
+    }
     this.entries.clear();
     this.pendingSnapshot.clear();
     this.selectedModelId = null;
@@ -790,7 +930,7 @@ export class HumanoidController {
 
   saveConfig() {
     const characters = [...this.entries.values()].map((entry) =>
-      characterToConfig(entry, this.viewport.modelById(entry.modelId))
+      characterToConfig(entry, this.viewport.modelById(entry.modelId), this.modular.serialize(entry))
     );
     return exportConfig(characters);
   }
@@ -825,8 +965,9 @@ export class HumanoidController {
     this.history = [];
     this.redoStack = [];
 
+    const moduleWarnings = [];
     for (const character of parsed.characters) {
-      this.create({
+      const created = this.create({
         name: character.name,
         params: character.params,
         pose: character.pose,
@@ -835,7 +976,12 @@ export class HumanoidController {
         select: false,
         silent: true
       });
+      if (character.modules?.length) {
+        const restored = this.modular.restore(created, character.modules);
+        for (const warning of restored.warnings) moduleWarnings.push(`${character.name}: ${warning}`);
+      }
     }
+    for (const warning of moduleWarnings) parsed.warnings.push(warning);
 
     const modelIds = [...this.entries.keys()];
     const last = modelIds.at(-1) || null;

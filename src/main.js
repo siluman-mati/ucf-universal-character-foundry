@@ -825,8 +825,8 @@ renderValidation();
 booted = true;
 
 window.__ucf = {
-  version: '1.1.0-stage1',
-  stage: 1,
+  version: '1.1.0-stage4',
+  stage: 4,
   ready: true,
   get cameraSettled() {
     return viewport.cameraSettled;
@@ -931,6 +931,25 @@ window.__ucf = {
   },
   get humanoid() {
     return humanoid;
+  },
+  get modular() {
+    const controller = humanoid;
+    return {
+      state: () => controller?.moduleState() || { attached: [], library: [], summary: null },
+      library: () => controller?.moduleState().library || [],
+      attached: () => controller?.moduleState().attached || [],
+      attach: (moduleId) => controller?.attachModule(moduleId) || null,
+      detach: (instanceId) => controller?.detachModule(instanceId) || false,
+      replace: (instanceId) => controller?.replaceModule(instanceId) || false,
+      remove: (instanceId) => controller?.deleteModule(instanceId) || false,
+      rename: (instanceId, name) => controller?.renameModule(instanceId, name) || false,
+      setMaterial: (instanceId, values) => controller?.setModuleMaterial(instanceId, values) || false,
+      setVisible: (instanceId, visible) => controller?.setModuleVisible(instanceId, visible) || false,
+      importManifest: (text) => controller?.importModuleManifest(text) || null,
+      preview: (moduleId) => controller?.previewModule(moduleId) || null,
+      select: (moduleId) => controller?.modulePanel?.selectModule(moduleId),
+      panel: () => controller?.modulePanel || null
+    };
   },
   // Untuk pengukuran/pengujian lanjutan; bukan API publik aplikasi.
   get scene() {
