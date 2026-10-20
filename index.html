@@ -4,8 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="color-scheme" content="dark" />
-  <meta name="description" content="Universal Character Foundry v1.1 — Tahap 4: viewport 3D, humanoid prosedural, rigging, dan sistem modul karakter." />
-  <title>Universal Character Foundry — Tahap 4</title>
+  <meta name="description" content="Universal Character Foundry v1.1 — Tahap 5: viewport 3D, humanoid prosedural, rigging, sistem modul, dan animasi/retargeting." />
+  <title>Universal Character Foundry — Tahap 5</title>
   <link rel="stylesheet" href="./src/styles.css" />
 </head>
 <body>
@@ -15,7 +15,7 @@
         <div class="brand-mark" aria-hidden="true">UCF</div>
         <div class="brand-text">
           <strong>Universal Character Foundry</strong>
-          <span>v1.1 · Tahap 4 — modul karakter</span>
+          <span>v1.1 · Tahap 5 — animasi &amp; retargeting</span>
         </div>
       </div>
       <div class="topbar-actions">
@@ -173,9 +173,53 @@
           <div id="moduleCompat" class="module-compat"></div>
         </section>
 
+        <section class="panel-section" id="animationSection">
+          <div class="section-head"><h2>8 · Animasi</h2><span id="animStatus" class="count">belum ada klip</span></div>
+          <p class="hint">
+            Klip native UCF (hasil bake dari pose parametrik, kaki disesuaikan ke lantai) atau klip
+            asli model impor. Retargeting memakai peta tulang berbasis struktur — hierarki, arah, dan
+            sisi dunia — bukan nama tulang.
+          </p>
+          <label class="field">
+            <span>Klip</span>
+            <select id="animClip" class="select" aria-label="Pilih klip animasi"></select>
+          </label>
+          <div class="row-buttons wrap">
+            <button id="animLoad" class="btn primary" type="button">Muat klip</button>
+            <button id="animPlay" class="btn" type="button">Putar</button>
+            <button id="animPause" class="btn" type="button">Jeda</button>
+            <button id="animStop" class="btn" type="button">Stop</button>
+            <button id="animReset" class="btn" type="button">Reset pose</button>
+          </div>
+          <div class="anim-transport">
+            <label class="check"><input id="animLoop" type="checkbox" checked /> <span>Loop</span></label>
+            <label class="param-row"><span>Kecepatan</span><input id="animSpeed" type="range" min="0.25" max="2" step="0.05" value="1" /><output id="animSpeedOut">1.00×</output></label>
+            <label class="param-row"><span>Timeline</span><input id="animTime" type="range" min="0" max="1000" step="1" value="0" /><output id="animTimeOut">0.00 / 0.00 s</output></label>
+          </div>
+          <div class="row-buttons wrap">
+            <button id="animTest" class="btn" type="button">Uji animasi</button>
+          </div>
+          <div id="animReport" class="anim-report hint">Pilih klip lalu tekan "Uji animasi" untuk mengukur lantai, lutut, tangan, regangan mesh, dan loop.</div>
+
+          <h3 class="subhead">Retargeting</h3>
+          <label class="field">
+            <span>Sumber (model impor beranimasi)</span>
+            <select id="animSource" class="select" aria-label="Model sumber animasi"></select>
+          </label>
+          <label class="field">
+            <span>Klip sumber</span>
+            <select id="animSourceClip" class="select" aria-label="Klip sumber"></select>
+          </label>
+          <div class="row-buttons wrap">
+            <button id="animMap" class="btn" type="button">Buat peta tulang</button>
+            <button id="animRetarget" class="btn primary" type="button">Retarget &amp; muat</button>
+          </div>
+          <div id="animMapReport" class="anim-map"></div>
+        </section>
+
         <section class="panel-section grow">
           <div class="section-head">
-            <h2>8 · Status validasi</h2>
+            <h2>9 · Status validasi</h2>
             <span id="validationSummary" class="count">—</span>
           </div>
           <div id="validationList" class="validation-list" aria-live="polite"></div>
@@ -185,10 +229,13 @@
         <section class="panel-section">
           <div class="section-head"><h2>Batasan tahap ini</h2></div>
           <p class="hint">
-            Tahap 4 mencakup 35 parameter humanoid, skeleton 51 tulang, skin weights teruji,
-            serta sistem modul (body, skin, wajah, rambut, atasan, bawahan, alas kaki, aksesori)
-            dengan pemeriksaan kompatibilitas dan clipping. Belum aktif: animasi/retargeting dan
-            ekspor. Tombol untuk fitur yang belum ada sengaja tidak dibuat.
+            Tahap 5 mencakup 35 parameter humanoid, skeleton 51 tulang, skin weights teruji,
+            sistem modul dengan validasi kompatibilitas, serta animasi: 5 klip native, pemutaran
+            klip asli model impor, retargeting berbasis struktur tulang (bukan nama), dan
+            pengukuran deformasi mesh. Belum aktif: ekspor GLB/FBX/VRM dan kompatibilitas
+            model/animasi eksternal menyeluruh — keduanya diuji di Tahap 6–7. Retarget di sini
+            hanya dibuktikan pada satu sumber uji (XBot/Mixamo); model luar lain belum diuji.
+            Tombol untuk fitur yang belum ada sengaja tidak dibuat.
           </p>
         </section>
       </aside>

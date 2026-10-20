@@ -93,6 +93,8 @@ export class Viewport {
     this.raycaster = new THREE.Raycaster();
     this.pointer = new THREE.Vector2();
     this._down = null;
+    this.frameListeners = new Set();
+    this._lastTick = performance.now();
     this._bindPicking();
 
     this.resizeObserver = new ResizeObserver(() => this.resize());
@@ -148,7 +150,19 @@ export class Viewport {
     this.camera.updateProjectionMatrix();
   }
 
+  /** Daftarkan callback per frame (dipakai pemutar animasi). */
+  addFrameListener(fn) {
+    this.frameListeners.add(fn);
+    return () => this.frameListeners.delete(fn);
+  }
+
   tick() {
+    const now = performance.now();
+    const delta = Math.min(0.25, Math.max(0, (now - (this._lastTick || now)) / 1000));
+    this._lastTick = now;
+    for (const fn of this.frameListeners) {
+      try { fn(delta); } catch (error) { console.error('frame listener error', error); }
+    }
     if (this.tween) {
       const now = performance.now();
       const t = Math.min(1, (now - this.tween.start) / this.tween.duration);
@@ -330,6 +344,12 @@ export class Viewport {
     bboxHelper.visible = this.toggles.bbox;
     this.bboxGroup.add(bboxHelper);
 
+    const restPose = [];
+    root.traverse((object) => {
+      if (object.isBone) restPose.push({ object, quat: object.quaternion.clone(), pos: object.position.clone() });
+    });
+    root.userData.ucfRestPose = restPose;
+
     const model = {
       id: `model-${++this.modelSeq}`,
       name: meta.name || `Model ${this.modelSeq}`,
@@ -338,7 +358,8 @@ export class Viewport {
       bbox,
       bboxHelper,
       stats: meta.stats || null,
-      clips: meta.clips || [],
+      clips: Array.isArray(meta.clips) ? meta.clips : [],
+      restPose,
       report: meta.report || null
     };
     root.userData.ucfModelId = model.id;

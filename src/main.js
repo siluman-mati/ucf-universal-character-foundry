@@ -497,16 +497,19 @@ async function importOne(file) {
   setBusy(true, `Mengimpor ${file.name}…`);
   setStatus(`Mengimpor ${file.name}…`);
   try {
-    const { report, root } = await importModelFile(file);
+    const { report, root, animations } = await importModelFile(file);
     viewport.addModel(root, {
       name: file.name,
       fileName: file.name,
       stats: report.stats,
-      clips: report.animationCount,
+      clips: animations,
       report
     });
     viewport.setWireframe(ui.toggleWireframe.checked);
     viewport.fitAll({ animate: true });
+    // Daftar sumber retarget harus langsung menampilkan model yang baru diimpor;
+    // tanpa ini dropdown tetap kosong sampai panel dirender ulang oleh aksi lain.
+    humanoid?.animPanel?.refreshSources?.();
     state.lastImport = report;
     renderImportReport(report);
 
@@ -825,8 +828,8 @@ renderValidation();
 booted = true;
 
 window.__ucf = {
-  version: '1.1.0-stage4',
-  stage: 4,
+  version: '1.1.0-stage5',
+  stage: 5,
   ready: true,
   get cameraSettled() {
     return viewport.cameraSettled;
@@ -949,6 +952,42 @@ window.__ucf = {
       preview: (moduleId) => controller?.previewModule(moduleId) || null,
       select: (moduleId) => controller?.modulePanel?.selectModule(moduleId),
       panel: () => controller?.modulePanel || null
+    };
+  },
+  get log() {
+    return { records: log.records, summary: log.summary() };
+  },
+  get three() {
+    return THREE;
+  },
+  get anim() {
+    const controller = humanoid;
+    const player = () => controller?.anim || null;
+    return {
+      clips: () => player()?.listClips() || [],
+      sources: () => player()?.importedModels() || [],
+      state: () => player()?.state || null,
+      // menerima dua gaya pemanggilan: load('native','walk') atau load({kind:'retarget', id, modelId})
+      load: (kind, id, modelId = null) =>
+        player()?.load(typeof kind === 'object' ? kind : { kind, id, modelId }) || null,
+      play: () => player()?.play() || false,
+      pause: () => player()?.pause() || false,
+      stop: () => player()?.stop() || false,
+      reset: () => player()?.reset() || false,
+      setSpeed: (value) => player()?.setSpeed(value) || 1,
+      setLoop: (value) => player()?.setLoop(value) || false,
+      seek: (time) => player()?.seek(time) || false,
+      evaluate: (options) => player()?.evaluate(options) || null,
+      buildMapping: (modelId) => player()?.buildMapping(modelId) || null,
+      retarget: (modelId, clipName) => player()?.retarget(modelId, clipName) || null,
+      retargeted: () => player()?.retargetedClips() || [],
+      verify: () => player()?.lastVerify || null,
+      evaluation: () => player()?.lastEvaluation || null,
+      panel: () => controller?.animPanel || null,
+      nativeMeta: (id) => {
+        const clip = player()?.nativeClips(controller?.current()).find((item) => item.id === id);
+        return clip?.meta || null;
+      }
     };
   },
   // Untuk pengukuran/pengujian lanjutan; bukan API publik aplikasi.

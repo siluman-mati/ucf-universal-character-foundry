@@ -115,12 +115,32 @@ export class ModularManager {
     }
 
     const s = entry.params.height / NOMINAL_HEIGHT;
-    const built = runGenerator(module.generator, {
-      params: entry.params,
-      s,
-      rig,
-      options: { ...module.options, ...(instance?.options || {}) }
-    });
+    // Geometri modul disusun dari posisi tulang pada BIND POSE. Kalau karakter sedang
+    // berpose/beranimasi, pose dipulihkan dulu supaya modul tidak tergambar di posisi salah.
+    const poseStore = rig.list.map((item) => ({ bone: item, quat: item.quaternion.clone(), pos: item.position.clone() }));
+    const restorePose = () => {
+      for (const item of poseStore) {
+        item.bone.quaternion.copy(item.quat);
+        item.bone.position.copy(item.pos);
+      }
+      rig.root.updateMatrixWorld(true);
+    };
+    const resetToBind = () => {
+      for (const item of rig.list) item.quaternion.identity();
+      rig.root.updateMatrixWorld(true);
+    };
+    resetToBind();
+    let built = null;
+    try {
+      built = runGenerator(module.generator, {
+        params: entry.params,
+        s,
+        rig,
+        options: { ...module.options, ...(instance?.options || {}) }
+      });
+    } finally {
+      restorePose();
+    }
     if (!built) return { error: `Generator "${module.generator}" tidak tersedia.` };
 
     const materials = [];

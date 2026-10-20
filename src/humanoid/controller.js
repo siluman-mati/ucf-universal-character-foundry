@@ -18,6 +18,8 @@ import { objectSignature } from './signature.js';
 import { measureDeformation, applyPose } from './rig.js';
 import { ModularManager, BASE_MODULE_ID } from '../modular/manager.js';
 import { ModularPanel } from '../modular/ui.js';
+import { AnimationPlayer } from '../anim/player.js';
+import { AnimationPanel } from '../anim/ui.js';
 import { exportConfig, parseConfig, sanitizeCharacterName, characterToConfig } from './config.js';
 import { summarize } from '../stats.js';
 import { RESULT } from '../validation.js';
@@ -51,6 +53,17 @@ export class HumanoidController {
     this.modulePanel = new ModularPanel({
       controller: this,
       manager: this.modular,
+      status: (message, level) => this.status?.(message, level)
+    });
+    this.anim = new AnimationPlayer({
+      viewport,
+      getEntry: () => this.current(),
+      status: (message, level) => this.status?.(message, level),
+      onChange: (state) => this.animPanel?.syncState(state)
+    });
+    this.animPanel = new AnimationPanel({
+      controller: this,
+      player: this.anim,
       status: (message, level) => this.status?.(message, level)
     });
 
@@ -279,6 +292,7 @@ export class HumanoidController {
     this.updateReadout(entry);
     this.renderRig();
     this.modulePanel?.render();
+    this.animPanel?.render();
   }
 
   updateReadout(entry) {
@@ -308,6 +322,18 @@ export class HumanoidController {
       result,
       warnings: Array.isArray(warnings) ? warnings : [],
       errors: result === RESULT.FAIL ? [details.alasan || 'modul ditolak'] : [],
+      details
+    });
+  }
+
+  recordAnim(test, result, details = {}, warnings = []) {
+    this.log?.add({
+      group: 'E. Animasi',
+      test,
+      model: this.current()?.name || '—',
+      result,
+      warnings: Array.isArray(warnings) ? warnings : [],
+      errors: result === RESULT.FAIL ? [details.alasan || 'pengujian animasi gagal'] : [],
       details
     });
   }
@@ -707,6 +733,7 @@ export class HumanoidController {
   }
 
   rebuild(entry) {
+    if (this.anim?.clip) this.anim.reset();
     this.disposeRigHelpers(entry);
     const built = buildHumanoid(entry.params, entry.pose);
     entry.params = { ...built.params };
@@ -835,6 +862,7 @@ export class HumanoidController {
     const entry = this.current();
     if (!entry) return false;
     const name = entry.name;
+    if (this.anim?.clip) this.anim.reset();
     this.modular.clear(entry);
     this.disposeRigHelpers(entry);
     this.viewport.removeModel(entry.modelId);
@@ -912,6 +940,7 @@ export class HumanoidController {
   }
 
   clearAll() {
+    if (this.anim?.clip) this.anim.reset();
     for (const entry of [...this.entries.values()]) {
       this.modular.clear(entry);
       this.disposeRigHelpers(entry);

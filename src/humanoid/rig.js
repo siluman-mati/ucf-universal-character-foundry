@@ -316,6 +316,9 @@ export function rigify(content, { params, s, pose = 'T' } = {}) {
 
   applyPose(rig, pose);
   rigRoot.updateMatrixWorld(true);
+  // Pose acuan (bind pose karakter) disimpan sekali di sini. Reset animasi selalu
+  // kembali ke pose ini, bukan ke pose yang kebetulan aktif saat klip dimuat.
+  rig.restPose = list.map((item) => ({ bone: item, quat: item.quaternion.clone(), pos: item.position.clone() }));
   return rig;
 }
 
@@ -325,6 +328,10 @@ export function rigify(content, { params, s, pose = 'T' } = {}) {
  * Tidak menambah tulang dan tidak mengubah bobot mesh badan.
  */
 export function skinGeometryForRig(geometry, candidateNames, rig) {
+  // Bobot harus dihitung pada BIND POSE, bukan pada pose animasi yang kebetulan aktif.
+  // Tanpa ini, memasang modul saat karakter sedang berpose menghasilkan bobot yang salah.
+  const saved = rig.list.map((item) => ({ bone: item, quat: item.quaternion.clone(), pos: item.position.clone() }));
+  for (const item of rig.list) item.quaternion.identity();
   rig.root.updateMatrixWorld(true);
   const inverse = rig.root.matrixWorld.clone().invert();
   const indexByName = new Map(rig.list.map((bone, index) => [bone.name, index]));
@@ -348,6 +355,11 @@ export function skinGeometryForRig(geometry, candidateNames, rig) {
   const skin = computeSkin(geometry, candidateNames, segments, indexByName);
   geometry.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(skin.skinIndex, 4));
   geometry.setAttribute('skinWeight', new THREE.Float32BufferAttribute(skin.skinWeight, 4));
+  for (const item of saved) {
+    item.bone.quaternion.copy(item.quat);
+    item.bone.position.copy(item.pos);
+  }
+  rig.root.updateMatrixWorld(true);
   return skin.stats;
 }
 

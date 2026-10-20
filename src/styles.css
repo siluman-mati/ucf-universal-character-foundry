@@ -398,3 +398,19 @@ table.kv td { font-family: var(--mono); font-variant-numeric: tabular-nums; text
 @media (max-width: 980px) {
   .module-toolbar { grid-template-columns: 1fr; }
 }
+
+/* ---------- Tahap 5: animasi & retargeting ---------- */
+.anim-transport { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
+.anim-transport .param-row { margin: 0; }
+.anim-report { display: flex; flex-direction: column; gap: 4px; min-height: 16px; }
+.anim-report[data-level="error"] { color: #fca5a5; }
+.anim-map { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.map-summary { font-size: 10.5px; color: var(--muted); line-height: 1.4; }
+.map-details { font-size: 10.5px; }
+.map-details summary { cursor: pointer; color: #93c5fd; }
+.map-table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 10px; }
+.map-table th { text-align: left; color: #7f93ad; font-weight: 600; border-bottom: 1px solid #1e293b; padding: 3px 4px; }
+.map-table td { color: #cbd5e1; border-bottom: 1px solid #131c2a; padding: 3px 4px; word-break: break-word; }
+.map-table tbody tr:nth-child(even) { background: rgba(30, 41, 59, 0.35); }
+#animReport .compat-row, #animMapReport .compat-row { display: grid; grid-template-columns: 58px 1fr; gap: 2px 8px; padding: 4px 0; border-bottom: 1px solid #16202e; }
+#animStatus { font-variant-numeric: tabular-nums; }
