@@ -3,7 +3,16 @@
  * Fungsi murni (tanpa DOM / WebGL) agar dapat diuji dengan node:test.
  */
 
-export const SUPPORTED_FORMATS = Object.freeze(['glb', 'gltf']);
+// Tahap 6: VRM adalah glTF 2.0 (kontainer GLB + ekstensi VRM), FBX diparse dengan
+// FBXLoader milik three.js yang dimuat malas (hanya saat berkas .fbx dipilih).
+export const SUPPORTED_FORMATS = Object.freeze(['glb', 'gltf', 'vrm', 'fbx']);
+
+export const FORMAT_NOTES = Object.freeze({
+  glb: 'glTF binary 2.0',
+  gltf: 'glTF JSON 2.0 (resource harus tersemat)',
+  vrm: 'VRM 0.x/1.0 — dibaca sebagai glTF; metadata VRM (humanoid, blendshape, spring bone) diabaikan',
+  fbx: 'FBX — diparse dengan FBXLoader three.js; unit asli dipertahankan (tidak diskalakan otomatis)'
+});
 
 /** Ekstensi yang diketahui didukung three.js 0.180 (tanpa dekoder tambahan). */
 export const KNOWN_SUPPORTED_EXTENSIONS = Object.freeze([

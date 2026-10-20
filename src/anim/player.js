@@ -321,10 +321,46 @@ export class AnimationPlayer {
 
   analyzeModel(model) {
     if (!model) return null;
+    // Model eksternal sering punya LEBIH DARI SATU skeleton (mis. badan + pakaian).
+    // Memakai skeleton pertama saja membuat sebagian tulang (kadang justru Hips) hilang.
     const skeleton = (() => {
-      let found = null;
-      model.root.traverse((object) => { if (!found && object.isSkinnedMesh && object.skeleton) found = object.skeleton; });
-      return found;
+      // Urutkan skinned mesh dari yang paling besar: skeleton mesh terbesar adalah
+      // hierarki utama. YBot.fbx memuat salinan skeleton kedua yang TERSARANG di dalam
+      // yang pertama (bukan sejajar), jadi menggabungkan mentah-mentah merusak hierarki.
+      const meshes = [];
+      model.root.traverse((object) => {
+        if (!object.isSkinnedMesh || !object.skeleton) return;
+        meshes.push({ object, weight: object.geometry?.getAttribute('position')?.count || 0 });
+      });
+      meshes.sort((a, b) => b.weight - a.weight);
+      // tulang asli punya anak; salinan daun YBot.fbx tidak punya anak — keduanya
+      // punya nama sama, jadi pilih yang punya anak terbanyak.
+      const seen = new Set();
+      const byName = new Map();
+      for (const { object } of meshes) {
+        for (const bone of object.skeleton.bones) {
+          if (seen.has(bone)) continue;
+          seen.add(bone);
+          const list = byName.get(bone.name) || [];
+          list.push(bone);
+          byName.set(bone.name, list);
+        }
+      }
+      const bestPerName = new Map();
+      for (const [name, list] of byName) {
+        if (list.length === 1) { bestPerName.set(name, list[0]); continue; }
+        list.sort((a, b) => b.children.length - a.children.length || b.children.filter((child) => child.isBone).length - a.children.filter((child) => child.isBone).length);
+        bestPerName.set(name, list[0]);
+      }
+      const bones = [];
+      for (const { object } of meshes) {
+        for (const bone of object.skeleton.bones) {
+          if (bestPerName.get(bone.name) !== bone && byName.get(bone.name)?.length > 1) continue;
+          if (bones.includes(bone)) continue;
+          bones.push(bone);
+        }
+      }
+      return bones.length ? { bones } : null;
     })();
     const rest = model.userData?.ucfRestPose || null;
     if (rest) {

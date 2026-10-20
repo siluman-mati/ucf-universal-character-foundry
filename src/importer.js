@@ -23,6 +23,72 @@ function warnExternalResources(externalResources) {
 }
 
 /**
+ * Impor FBX (Tahap 6). FBXLoader three.js dimuat malas supaya bundel utama tetap ramping.
+ * Skala sumber TIDAK diubah: FBX sering memakai sentimeter, dan mengubahnya diam-diam akan
+ * membuat perbandingan dengan aplikasi lain salah. Ukuran asli dilaporkan apa adanya.
+ */
+async function importFbx(file, buffer) {
+  const started = performance.now();
+  let FBXLoader;
+  try {
+    ({ FBXLoader } = await import('three/addons/loaders/FBXLoader.js'));
+  } catch (error) {
+    throw new ImportError(`FBXLoader gagal dimuat: ${error?.message || error}`, 'loader');
+  }
+  let root;
+  try {
+    root = new FBXLoader().parse(buffer, '');
+  } catch (error) {
+    throw new ImportError(`Gagal mengurai FBX: ${error?.message || error}`, 'parse');
+  }
+  if (!root) throw new ImportError('FBX tidak menghasilkan scene yang dapat dimuat.', 'no-scene');
+  const loadMs = performance.now() - started;
+  const animations = Array.isArray(root.animations) ? root.animations : [];
+
+  const scale = root.scale.toArray();
+  if (scale.some((value) => Math.abs(value - 1) > 1e-6)) {
+    root.scale.set(1, 1, 1);
+  }
+  root.updateMatrixWorld(true);
+
+  const stats = summarize(root, { clips: animations, json: null });
+  const warnings = [];
+  const isSentimeter = stats.bounds?.size
+    ? Math.max(...stats.bounds.size) >= 30
+    : false;
+  if (isSentimeter) {
+    warnings.push(
+      'FBX: dimensi terukur ≥30 satuan; banyak FBX memakai sentimeter. Viewer menyesuaikan kamera, ' +
+        'tetapi angka dimensi asli dipertahankan. Untuk perbandingan 1:1 dengan aplikasi lain, gunakan nilai “meter”.'
+    );
+  } else {
+    warnings.push(
+      'FBX: diparse dengan FBXLoader three.js. Skala unit asli dipertahankan (tidak diskalakan otomatis agar tidak dobel terapkan).'
+    );
+  }
+  if (scale.some((value) => Math.abs(value - 1) > 1e-6)) {
+    warnings.push(`Transform scale di akar FBX (${scale.map((value) => value.toFixed(3)).join(', ')}) dinormalkan ke 1 agar tidak terhitung ganda; ukuran geometri tidak diubah.`);
+  }
+  if (stats.meshes === 0) warnings.push('FBX tidak berisi mesh yang dapat ditampilkan (mungkin hanya animasi/skeleton).');
+  if (stats.bones === 0 && stats.skinnedMeshes > 0) warnings.push('Skinned mesh tanpa node tulang; binding perlu diperiksa.');
+
+  const report = {
+    ok: true,
+    fileName: file.name,
+    format: 'fbx',
+    bytes: buffer.byteLength,
+    loadMs,
+    stats,
+    warnings,
+    extensions: { used: [], supported: [], unsupported: [], unverified: [], required: [] },
+    animationCount: animations.length,
+    clipNames: animations.map((clip) => clip.name || '(tanpa nama)'),
+    rootName: root.name || '(tanpa nama)'
+  };
+  return { report, root, animations };
+}
+
+/**
  * @param {File} file
  * @returns {Promise<{report: object, root: import('three').Object3D, animations: import('three').AnimationClip[]}>}
  */
@@ -30,7 +96,7 @@ export async function importModelFile(file) {
   const format = detectFormat(file?.name);
   if (!format) {
     throw new ImportError(
-      `Format berkas tidak didukung: "${file?.name || 'tanpa nama'}". Tahap 1 hanya menerima .glb atau .gltf.`,
+      `Format berkas tidak didukung: "${file?.name || 'tanpa nama'}". Format yang diterima: .glb, .gltf, .vrm, .fbx.`,
       'format'
     );
   }
@@ -38,6 +104,10 @@ export async function importModelFile(file) {
   const buffer = await file.arrayBuffer();
   if (!buffer || buffer.byteLength === 0) {
     throw new ImportError('Berkas kosong (0 byte).', 'empty');
+  }
+
+  if (format === 'fbx') {
+    return importFbx(file, buffer);
   }
 
   const json = readGltfJson(buffer);
@@ -113,6 +183,16 @@ export async function importModelFile(file) {
   }
   if (stats.skinnedMeshes === 0 && stats.bones > 0) {
     warnings.push('Tulang ditemukan tetapi tidak ada skinned mesh; skeleton belum menggerakkan mesh.');
+  }
+
+  if (format === 'vrm') {
+    warnings.push(
+      'VRM dibaca sebagai glTF 2.0. Metadata khusus VRM (humanoid mapping, blendshape/expression, ' +
+        'spring bone) TIDAK dipakai — posisi tulang dan skin weights diambil apa adanya dari berkas.'
+    );
+    if (extensions.used.some((name) => /^VRM/.test(name))) {
+      warnings.push(`Ekstensi VRM terdeteksi: ${extensions.used.filter((name) => /^VRM/.test(name)).join(', ')} (diabaikan).`);
+    }
   }
 
   const report = {

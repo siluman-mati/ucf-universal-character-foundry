@@ -36,8 +36,8 @@ test('detectFormat menerima glb/gltf dan menolak format lain', () => {
   assert.equal(detectFormat('model.glb'), 'glb');
   assert.equal(detectFormat('MODEL.GLTF'), 'gltf');
   assert.equal(detectFormat('char.v1.gltf?token=1'), 'gltf');
-  assert.equal(detectFormat('model.fbx'), null);
-  assert.equal(detectFormat('model.vrm'), null);
+  assert.equal(detectFormat('model.fbx'), 'fbx');
+  assert.equal(detectFormat('model.vrm'), 'vrm');
   assert.equal(detectFormat('tanpaekstensi'), null);
   assert.equal(detectFormat(null), null);
 });

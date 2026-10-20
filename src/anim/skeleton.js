@@ -12,8 +12,67 @@ import * as THREE from 'three';
 const EPS = 1e-9;
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
 
-function boneChildren(bone, allowed) {
-  return bone.children.filter((child) => child.isBone && (!allowed || allowed.has(child)));
+/**
+ * Graf tulang yang sudah dinormalisasi.
+ *
+ * Sebagian aset (mis. skeleton ganda pada YBot.fbx) menaruh SALINAN setiap tulang
+ * dengan nama sama sebagai anak dari tulang aslinya, dan `skeleton.bones` justru
+ * menunjuk salinan daun itu. Bila daftar tulang dipakai apa adanya, seluruh hierarki
+ * runtuh menjadi 52 tulang tanpa induk dan tanpa anak, sehingga peran tulang tidak
+ * bisa dikenali. Normalisasi: tambahkan leluhur bertipe tulang, buang salinan
+ * bernama sama yang menempel pada induk bernama sama, lalu sambungkan induk/anak
+ * melewati salinan yang dibuang.
+ */
+function buildBoneGraph(root, skeleton) {
+  const raw = new Set(skeleton?.bones?.length ? skeleton.bones : []);
+  if (!raw.size) root.traverse((object) => { if (object.isBone) raw.add(object); });
+  for (const bone of [...raw]) {
+    let node = bone.parent;
+    while (node && node.isBone) { raw.add(node); node = node.parent; }
+  }
+  // untuk nama ganda: simpan hanya tulang dengan anak terbanyak (tulang asli),
+  // bukan salinan daun yang ditempel di bawahnya — salinan itu ada di `skeleton.bones`
+  const byName = new Map();
+  for (const bone of raw) {
+    if (!bone.name) continue;
+    const list = byName.get(bone.name) || [];
+    list.push(bone);
+    byName.set(bone.name, list);
+  }
+  const preferred = new Set();
+  for (const [name, list] of byName) {
+    if (list.length === 1) continue;
+    list.sort((a, b) => b.children.length - a.children.length || b.children.filter((child) => child.isBone).length - a.children.filter((child) => child.isBone).length);
+    for (let i = 1; i < list.length; i += 1) preferred.delete(list[i]);
+    preferred.add(list[0]);
+  }
+  const kept = new Set();
+  for (const bone of raw) {
+    if (bone.name && byName.get(bone.name)?.length > 1) {
+      if (!preferred.has(bone)) continue; // salinan daun
+    } else {
+      const parent = bone.parent;
+      if (parent?.isBone && parent.name && parent.name === bone.name) continue;
+    }
+    kept.add(bone);
+  }
+  const parentOf = new Map();
+  const childrenOf = new Map();
+  for (const bone of kept) {
+    let node = bone.parent;
+    while (node && !kept.has(node)) node = node.parent;
+    parentOf.set(bone, node || null);
+    if (!node) continue;
+    if (!childrenOf.has(node)) childrenOf.set(node, []);
+    childrenOf.get(node).push(bone);
+  }
+  return {
+    bones: [...kept],
+    parentOf,
+    childrenOf,
+    children: (bone) => childrenOf.get(bone) || [],
+    dropped: raw.size - kept.size
+  };
 }
 
 function subtreeHeight(bone) {
@@ -98,26 +157,26 @@ function lowestLeaf(bones) {
   return best;
 }
 
-function lowestCommonAncestor(a, b) {
+function lowestCommonAncestor(a, b, parentOf) {
   const seen = new Set();
   let node = a;
   while (node) {
     seen.add(node);
-    node = node.parent?.isBone ? node.parent : null;
+    node = parentOf.get(node) || null;
   }
   node = b;
   while (node) {
     if (seen.has(node)) return node;
-    node = node.parent?.isBone ? node.parent : null;
+    node = parentOf.get(node) || null;
   }
   return null;
 }
 
-function chainFrom(start, allowed) {
+function chainFrom(start, children) {
   const chain = [start];
   let current = start;
   for (let guard = 0; guard < 12; guard += 1) {
-    const kids = boneChildren(current, allowed);
+    const kids = children(current);
     if (kids.length !== 1) break;
     current = kids[0];
     chain.push(current);
@@ -134,18 +193,18 @@ export function analyzeSkeleton(root, { skeleton = null } = {}) {
   if (!root) return null;
   root.updateMatrixWorld(true);
 
-  const bones = skeleton ? [...skeleton.bones] : [];
-  if (!bones.length) root.traverse((object) => { if (object.isBone) bones.push(object); });
+  const graph = buildBoneGraph(root, skeleton);
+  const bones = graph.bones;
   if (!bones.length) return null;
-  const allowed = new Set(bones);
+  const { parentOf, children } = graph;
 
   const entries = new Map();
   for (const bone of bones) {
     entries.set(bone, {
       bone,
       name: bone.name || '(tanpa nama)',
-      parent: bone.parent?.isBone && allowed.has(bone.parent) ? bone.parent : null,
-      children: boneChildren(bone, allowed),
+      parent: parentOf.get(bone) || null,
+      children: children(bone),
       worldPos: bone.getWorldPosition(new THREE.Vector3()),
       worldQuat: bone.getWorldQuaternion(new THREE.Quaternion()),
       localQuat: bone.quaternion.clone(),
@@ -177,8 +236,10 @@ export function analyzeSkeleton(root, { skeleton = null } = {}) {
     for (let j = i + 1; j < Math.min(sortedLeaves.length, 5); j += 1) {
       const a = sortedLeaves[i].bone;
       const b = sortedLeaves[j].bone;
-      const lca = lowestCommonAncestor(a, b);
-      if (lca && (entries.get(a).worldPos.y < minY + height * 0.2) && (entries.get(b).worldPos.y < minY + height * 0.2)) {
+      const lca = lowestCommonAncestor(a, b, parentOf);
+      // LCA bisa berada di luar daftar tulang yang diberikan (mis. skeleton kedua pada
+      // model multi-skin, atau tulang induk di luar set). Hanya terima bila terdaftar.
+      if (lca && entries.has(lca) && (entries.get(a).worldPos.y < minY + height * 0.2) && (entries.get(b).worldPos.y < minY + height * 0.2)) {
         hipsBone = lca;
         break;
       }
@@ -194,7 +255,14 @@ export function analyzeSkeleton(root, { skeleton = null } = {}) {
     }
     hipsBone = best?.bone || bones[0];
   }
+  if (!hipsBone) {
+    // cadangan: tulang dengan subtree terbesar di antara tulang paling atas
+    const candidates = [...entries.values()].filter((entry) => !entry.parent);
+    const pool = candidates.length ? candidates : [...entries.values()];
+    hipsBone = pool.reduce((best, entry) => (entry.children.length >= (best?.children.length ?? -1) ? entry : best), null)?.bone || null;
+  }
   const hipsEntry = entries.get(hipsBone);
+  if (!hipsEntry) return null; // skeleton tidak dapat dianalisis; pemanggil menangani null
   const hipsPos = hipsEntry.worldPos;
   hipsEntry.role = 'hips';
 
@@ -211,7 +279,7 @@ export function analyzeSkeleton(root, { skeleton = null } = {}) {
   for (const child of hipsEntry.children) {
     const stats = subtreeHeight(child);
     if (hipsPos.y - stats.lowest < height * 0.3) continue;
-    const chain = chainFrom(child, allowed);
+    const chain = chainFrom(child, children);
     legs.push({ root: child, chain, side: sideOf(entries.get(child)) });
   }
   legs.sort((a, b) => (a.side === 'R' ? -1 : 1) - (b.side === 'R' ? -1 : 1));
@@ -277,7 +345,12 @@ export function analyzeSkeleton(root, { skeleton = null } = {}) {
   });
 
   // ---- lengan ----
-  const armAnchor = chestEntry || neckEntry || hipsEntry;
+  // YBot/Mixamo menaruh bahu di anak Spine2, bukan di Chest. Cari jangkar lengan
+  // sebagai turunan batang yang pertama kali punya >=2 anak (percabangan ke bahu).
+  let armAnchor = chestEntry || neckEntry || hipsEntry;
+  for (const entry of trunkBones) {
+    if (entry.children.length >= 2) { armAnchor = entry; break; }
+  }
   const arms = [];
   const probe = new THREE.Vector3();
   for (const child of armAnchor.children) {
@@ -292,15 +365,15 @@ export function analyzeSkeleton(root, { skeleton = null } = {}) {
       if (Math.abs(dx) > Math.abs(extremeX)) extremeX = dx;
     });
     if (Math.abs(extremeX) < height * 0.12) continue;
-    const chain = chainFrom(child, allowed);
+    const chain = chainFrom(child, children);
     arms.push({ root: child, chain, side: extremeX > 0 ? 'R' : 'L', reach: Math.abs(extremeX) });
   }
   arms.sort((a, b) => (a.side === 'R' ? -1 : 1) - (b.side === 'R' ? -1 : 1));
 
   const fingerChainsOf = (handBone) => {
-    const kids = boneChildren(handBone, allowed);
+    const kids = children(handBone);
     return kids
-      .map((kid) => ({ root: kid, chain: chainFrom(kid, allowed) }))
+      .map((kid) => ({ root: kid, chain: chainFrom(kid, children) }))
       .filter((item) => item.chain.length >= 2);
   };
 

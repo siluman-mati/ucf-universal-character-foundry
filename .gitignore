@@ -3,3 +3,6 @@ dist/
 test-assets/XBot.glb
 *.log
 .DS_Store
+
+# fixtures eksternal (disalin on-demand dari rigPro, tidak didistribusikan)
+test-assets/external/

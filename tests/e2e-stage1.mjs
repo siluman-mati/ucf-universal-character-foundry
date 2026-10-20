@@ -478,7 +478,7 @@ async function main() {
     { timeout: 15000 }
   );
   const fbxRecord = await page.evaluate(() => window.__ucf.validation.records.find((record) => record.model === 'model.fbx'));
-  check('J3. Format .fbx ditolak eksplisit (Tahap 1 belum mendukung FBX)', /tidak didukung/i.test(fbxRecord?.errors[0] || ''), {
+  check('J3. FBX palsu: tercatat sebagai gagal dengan pesan yang jelas', fbxRecord?.result === 'FAIL' && /Gagal mengurai|ditolak/i.test(fbxRecord?.errors[0] || ''), {
     errors: fbxRecord?.errors
   });
 

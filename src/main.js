@@ -10,6 +10,7 @@ import { ValidationLog, RESULT } from './validation.js';
 import { HumanoidController } from './humanoid/controller.js';
 import { VIEW_ORDER, directionErrorDegrees } from './camera.js';
 import { formatNumber } from './format.js';
+import { inspectModel } from './anim/inspect.js';
 
 const $ = (selector) => document.querySelector(selector);
 const ui = {
@@ -954,6 +955,15 @@ window.__ucf = {
       panel: () => controller?.modulePanel || null
     };
   },
+  modelObject(modelId) {
+    return viewport.modelById(modelId) || viewport.models[viewport.models.length - 1] || null;
+  },
+  inspect(modelId) {
+    const model = viewport.modelById(modelId) || viewport.models[viewport.models.length - 1];
+    if (!model) return null;
+    return inspectModel(model.root, { name: model.name, fileName: model.fileName, clips: model.clips });
+  },
+  get humanoidEntries() { return [...humanoid.entries.values()].map((e)=>e.name); },
   get log() {
     return { records: log.records, summary: log.summary() };
   },

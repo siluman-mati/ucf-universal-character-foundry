@@ -99,7 +99,8 @@ export function buildBoneMapping(source, target, { sourceLabel = 'sumber', targe
     let parentConsistent = true;
     const sourceParentRole = entry.parent ? withSide(source.byName.get(entry.parent)?.role, source.byName.get(entry.parent)?.side) : null;
     const targetParentRole = match.parent ? withSide(target.byName.get(match.parent)?.role, target.byName.get(match.parent)?.side) : null;
-    if (sourceParentRole && targetRoles.has(sourceParentRole) && sourceParentRole !== targetParentRole) {
+    const isShoulderAnchoring = /^(clavicle|arm\.upper)/.test(key) && /^(neck|chest)$/.test(String(sourceParentRole || '').split(':')[0]) && /^(neck|chest)$/.test(String(targetParentRole || '').split(':')[0]);
+    if (sourceParentRole && targetRoles.has(sourceParentRole) && sourceParentRole !== targetParentRole && !isShoulderAnchoring) {
       parentConsistent = false;
       weak.push({ source: entry.name, target: match.name, reason: `induk ${sourceParentRole} ≠ ${targetParentRole}` });
     }
@@ -162,7 +163,8 @@ export function buildBoneMapping(source, target, { sourceLabel = 'sumber', targe
     if (!sourceEntry?.parent || !targetEntry?.parent) continue;
     const sourceParentPair = bySourceName.get(sourceEntry.parent);
     if (!sourceParentPair) continue;
-    if (sourceParentPair.target !== targetEntry.parent) hierarchyIssues += 1;
+    const shoulderAnchor = /^(clavicle|arm\.upper)/.test(pair.role) && ['Neck','Chest'].includes(sourceParentPair.target) && ['Neck','Chest'].includes(targetEntry.parent);
+    if (sourceParentPair.target !== targetEntry.parent && !shoulderAnchor) hierarchyIssues += 1;
   }
 
   const unmappedTarget = target.bones
