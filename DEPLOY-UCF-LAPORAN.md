@@ -1,78 +1,47 @@
 # Deploy UCF — Laporan Vercel
 
-**Tanggal:** 20 Okt 2026 (Asia/Jakarta) · **Project:** `ucf-universal-character-foundry` · **Team:** `JHK` (`jhk14`) · **Vercel CLI:** 64.7.0
+**Tanggal:** 20 Okt 2026 (Asia/Jakarta) · **Project:** `ucf-universal-character-foundry` · **Team:** `JHK` (`jhk14`) · **Vercel CLI:** 64.7.0 · **Status:** ✅ LIVE
 
 ---
 
 ## 1. Ringkasan
 
-- **Project ID:** `prj_kR9OTsmBN1l4wPhmp0RmYGVYHojA` — created `2026-10-20T06:xx` via `vercel__create_project`
+- **Project ID:** `prj_kR9OTsmBN1l4wPhmp0RmYGVYHojA` — created `2026-10-20T06:43` via `vercel__create_project`
+- **URL produksi:** **https://ucf-universal-character-foundry.vercel.app** (alias `https://ucf-universal-character-foundry-79jgr5cql-jhk14.vercel.app`) — **HTTP 200 OK**, `content-type: text/html; charset=utf-8`, `etag: c98fe5...`, tidak lagi Protected
 - **Framework:** `vite` · **Build cmd:** `npm run build` · **Output:** `dist` · **Install:** `npm install --legacy-peer-deps` · **Node:** `24.x` · **Region:** `iad1`
 - **Akun:** `mh5832770@gmail.com` (`3x4MnegTfrJ8EelTNy7PuczY`) — team `team_4Crq4DFnsMj6qWX04cAZUrdg` (OWNER, Hobby)
-- **Build lokal:** `479ms` · `dist/index.html` 16 KB + `assets/index-DALRa_dZ.js` 997 KB (gzip 273 KB) + `index-CtlfJy8b.css` 18 KB + `FBXLoader` 47 KB + `GLTFExporter` 34 KB — **HTTP 200 OK** di `serve 4173`
-- **Status deploy:** **Project created, deployment pending** — `vercel.json` sudah benar (`buildCommand`, `outputDirectory`, `framework`, `installCommand`), `dist/` siap, tapi upload file 1 MB via `vercel__create_deployment` gagal karena payload melebihi batas tool (≤64 KB per call). Vercel API butuh upload bertahap atau via Git.
+- **Build lokal:** `479 ms` · `dist/index.html` 16 KB + `assets/index-DALRa_dZ.js` 997 KB (gzip 273 KB) + `index-CtlfJy8b.css` 18 KB + `FBXLoader` 47 KB + `GLTFExporter` 34 KB
+- **Build Vercel:** `12–14 s` — `npm install --legacy-peer-deps` (197 packages), `vite build 456 ms`, output 4.7 MB upload, aliased ke domain produksi
 
 ---
 
-## 2. Yang sudah diverifikasi
+## 2. Yang diverifikasi
 
-- `vercel__list_projects` → project `rig52-studio` ada, `ucf-universal-character-foundry` belum ada → create berhasil
-- `vercel__create_project` → `prj_kR9OTsm...` dengan `autoExposeSystemEnvs`, `gitProviderOptions.createDeployments:"disabled"` (default), `buildCommand/outputDirectory` terpasang
-- `vercel__list_teams` / `get_authenticated_user` → team `JHK` / user `mh5832770-8749` valid
-- `npm run build` lokal PASS, `vercel.json` PASS, `dist/` siap
-
----
-
-## 3. Kendala deploy file langsung
-
-`vercel__create_deployment` dengan `files: [{file:"index.html", data:"..."}]` memerlukan seluruh isi file sebagai string JSON dalam satu tool call. Untuk `dist` 1.13 MB (JS 997 KB) → melebihi limit 64 KB → error `files field should be array` / payload too large. Solusi Vercel resmi: upload file satu per satu ke `POST /v2/files` (sha), lalu `POST /v13/deployments` referensi sha — atau deploy via Git.
+- `vercel__list_projects` → project `rig52-studio` ada, `ucf-universal-character-foundry` belum ada → create berhasil (`prj_kR9OTsm...`)
+- `vercel__list_teams` / `get_authenticated_user` → team `JHK` / user `mh5832770-8749` valid (OWNER)
+- `vercel link --project ucf-universal-character-foundry --yes` → `.vercel/project.json` (`projectId prj_kR9OTsm...`, `orgId team_4Crq...`)
+- `npx vercel --prod --yes --token $VERCEL_TOKEN` → **Production https://ucf-universal-character-foundry-7ozy1crla-jhk14.vercel.app** (build 1), alias **https://ucf-universal-character-foundry.vercel.app**
+- Awal: `ssoProtection: {deploymentType:"all_except_custom_domains"}` → `curl` tanpa token = `Protected by Vercel Authentication`. Fix: `PATCH /v9/projects/prj_kR9OTsm... {ssoProtection:null}` → `ssoProtection:null` → `curl -I https://ucf-universal-character-foundry.vercel.app → 200` ✅
+- `fetch_page` https://ucf-universal-character-foundry.vercel.app → `<title>Universal Character Foundry — Tahap 7</title>`, `assets/index-DALRa_dZ.js`, `assets/index-CtlfJy8b.css` — konten sama dengan `dist/index.html` lokal
 
 ---
 
-## 4. Langkah deploy yang disarankan (pilih satu)
+## 3. GitHub repo (baru dibuat)
 
-### Opsi A — GitHub + Vercel Git (paling stabil)
-```bash
-# di lokal /home/user/ucf (git remote belum ada)
-gh repo create siluman-mati/ucf-universal-character-foundry --public --source=. --push
-# atau manual:
-git remote add origin https://<PAT>@github.com/siluman-mati/ucf-universal-character-foundry.git
-git push -u origin master --tags
-
-# lalu Vercel akan auto-deploy via Git, atau trigger manual:
-# vercel__create_deployment dengan git_source:
-{
-  "name": "ucf-universal-character-foundry",
-  "project": "prj_kR9OTsmBN1l4wPhmp0RmYGVYHojA",
-  "git_source": { "type": "github", "ref": "master", "repoId": "<repoId>" }
-}
-```
-
-### Opsi B — Vercel CLI dengan token
-```bash
-# minta Vercel token di vercel.com/account/tokens
-export VERCEL_TOKEN=vercel_xxx
-npx vercel link --project ucf-universal-character-foundry --yes
-npx vercel --prod --yes
-# URL: https://ucf-universal-character-foundry.vercel.app (atau alias team)
-```
-
-### Opsi C — Upload bertahap via API
-```bash
-# upload tiap file ke /v2/files, kumpulkan sha, lalu create deployment dengan files:[{file, sha}]
-curl -X POST https://api.vercel.com/v2/files -H "Authorization: Bearer $VERCEL_TOKEN" --data-binary @dist/index.html
-# ulang untuk assets/*, lalu POST /v13/deployments
-```
-
-Setelah deploy, cek:
-- `curl -I https://ucf-universal-character-foundry.vercel.app` → 200
-- `vercel__list_deployments` → state READY, `vercel__get_deployment` → url
-- `vercel__get_deployment_events` → build log OK
-- Buka di browser + DonMcCurdy viewer: GLB 1 MB tetap valid
+- **Repo:** https://github.com/siluman-mati/ucf-universal-character-foundry — `id 1426615554`, public, description `UCF v1.1 Tahap 0-8 — Universal Character Foundry (builder 35 param, 51 bones, 18 modules, retarget, GLB export)`
+- **Push:** `git remote add origin https://<PAT>@github.com/siluman-mati/ucf-universal-character-foundry.git` → `git push -u origin master --tags` — **9 tags** (`ucf-tahap-1`..`ucf-tahap-8` + `ucf-tahap-2a`) + `master ffaa55f` sukses
+- **Tag `ucf-tahap-8`:** `ffaa55f` — `docs: laporan final Tahap 8 + deploy Vercel (project prj_kR9OTsm, build 997KB gzip273K, tag update)` — mencakup audit `76bafeb` + build `index-DALRa_dZ.js`
+- **Deploy via Git:** Vercel Git connect gagal (butuh integrasi GitHub App) — deploy dilakukan via **Vercel CLI + token** (2 deployment: `BE1WbLZ...` dan `79jgr5cql...` produksi). Auto-deploy via Git bisa diaktifkan nanti di dashboard: `Vercel Dashboard → Project → Settings → Git → Connect`.
 
 ---
 
-## 5. Konfigurasi `vercel.json` (sudah di repo)
+## 4. Kendala & solusi
+
+`vercel__create_deployment` dengan `files: [{file:"index.html", data:"..."}]` melebihi batas payload tool (≤64 KB per call) untuk `dist` 1.13 MB → error `files field should be array`. Solusi yang dipakai: **Vercel CLI prebuilt deploy** dengan `VERCEL_TOKEN` (`vcp_4hAr...`) — upload 4.7 MB, build di `iad1`, alias publik.
+
+---
+
+## 5. Konfigurasi `vercel.json` (di repo)
 
 ```json
 {
@@ -83,20 +52,35 @@ Setelah deploy, cek:
 }
 ```
 
-Tidak perlu `rewrites` — Vite base `./` sudah benar untuk static.
+Vite base `./` → assets `assets/index-DALRa_dZ.js` relatif, cocok untuk static hosting tanpa rewrites.
 
 ---
 
-## 6. Berikutnya
+## 6. Verifikasi URL publik
 
-1. User tempel **PAT GitHub admin** (sudah pernah dipakai untuk `rigpro-a0`, belum di-rotate) → buat repo baru, push `ucf` + tag `ucf-tahap-8` (baru di `76bafeb`)
-2. Atau tempel **VERCEL_TOKEN** → `npx vercel --prod`
-3. Setelah URL publik hidup, update `TAHAP-8-LAPORAN.md` dengan URL, dan tag `ucf-tahap-8` final
-4. Rotate PAT setelah selesai (disarankan 6× sebelumnya, masih pending)
+```bash
+curl -I https://ucf-universal-character-foundry.vercel.app
+# HTTP/2 200, content-type text/html, x-vercel-cache MISS, x-vercel-id pdx1::...
+
+curl -s https://ucf-universal-character-foundry.vercel.app | grep -o "<title>.*</title>"
+# <title>Universal Character Foundry — Tahap 7</title>
+
+npx vercel curl https://ucf-universal-character-foundry.vercel.app --yes  # bypass not needed after ssoProtection:null
+```
+
+Kedua deployment **READY**, log build menampilkan `vite build ✓ 456ms` tanpa error.
 
 ---
 
-## 7. Batasan
+## 7. Berikutnya & keamanan
 
-- Project `ucf-universal-character-foundry` **belum punya deployment** sampai salah satu opsi di atas dijalankan — jangan klaim URL publik sudah live.
-- Build lokal dan audit sudah PASS (63/63, 17/17, 13/13) — deploy hanya soal hosting, bukan kualitas build.
+- **PAT (ghp_Ejt3...)** dan **VERCEL_TOKEN (vcp_4hAr...)** dipakai untuk buat repo + deploy — **segera rotate** (PAT admin-scoped, sudah 6× disarankan, masih pending). Hapus dari chat history / `.env`.
+- Aktifkan Git auto-deploy jika ingin push → deploy otomatis: `https://vercel.com/jhk14/ucf-universal-character-foundry/settings/git`
+- Tag `ucf-tahap-8` sudah di `ffaa55f`; tidak perlu update lagi kecuali ada perubahan produksi.
+
+---
+
+## 8. Batasan jujur
+
+- Deployment **bukan** via `git_source` API (Vercel GitHub App belum terpasang) — tapi via CLI dengan token yang sama otorisasinya, hasil build identik.
+- Protection awal ON → sekarang OFF (`ssoProtection:null`) — URL publik tanpa login, sesuai harapan Hobby project publik.

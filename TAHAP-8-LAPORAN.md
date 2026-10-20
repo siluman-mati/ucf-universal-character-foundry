@@ -1,8 +1,8 @@
 # Tahap 8 — Laporan Validasi Penggunaan Nyata & Penyelesaian Celah Utama
 
-**Tanggal:** 20 Okt 2026 (Asia/Jakarta) · **Versi:** `1.1.0-stage8` · **Tag:** `ucf-tahap-8` (diperbarui ke `76bafeb`) · **Build:** `dist/assets/index-DALRa_dZ.js` 997 KB gzip 273 KB · **Commit:** `76bafeb` (audit) + `c283ede` (fitur Tahap 8) · **Checkpoint 1–7 dipertahankan**, rigPro A.0 tidak diubah.
+**Tanggal:** 20 Okt 2026 (Asia/Jakarta) · **Versi:** `1.1.0-stage8` · **Tag:** `ucf-tahap-8` (`ffaa55f` final) · **Build:** `dist/assets/index-DALRa_dZ.js` 997 KB gzip 273 KB · **Commit:** `ffaa55f` (docs final) + `76bafeb` (audit) + `c283ede` (fitur Tahap 8) · **Checkpoint 1–7 dipertahankan**, rigPro A.0 tidak diubah.
 
-Tahap 8 bukan rebuild — validasi nyata 5 prioritas Bagian 12, nutup celah Tahap 7, tanpa klaim Android fisik. Seluruh Tahap 1–8 lulus regresi, build produksi siap, project Vercel dibuat.
+Tahap 8 bukan rebuild — validasi nyata 5 prioritas Bagian 12, nutup celah Tahap 7, tanpa klaim Android fisik. Seluruh Tahap 1–8 lulus regresi, build produksi **live di https://ucf-universal-character-foundry.vercel.app (HTTP 200)**.
 
 ---
 
@@ -73,18 +73,20 @@ Tahap 1 42/42 · Tahap 2 18/18 · Tahap 3 15/15 · Tahap 4 21/21 · Tahap 5 20/2
 serve: HTTP 200 OK (4173)
 ```
 
-- **Checkpoint:** `ucf-tahap-1` .. `ucf-tahap-8` (tag `ucf-tahap-8` diperbarui ke `76bafeb`, semua tag lama utuh)
+- **Checkpoint:** `ucf-tahap-1` .. `ucf-tahap-8` (tag `ucf-tahap-8` final di `ffaa55f`, semua tag lama utuh) · **Repo:** https://github.com/siluman-mati/ucf-universal-character-foundry (`1426615554`) — `master` pushed + 9 tags
 - **File berubah Tahap 8:** `src/export/exportPanel.js` (skeleton rebinding + beforeStats fallback), `package.json` (stage8), `tests/e2e-stage8.mjs` (baru), `tests/audit-tahap7-detail.mjs` (detail), `vercel.json`, `TAHAP-8-LAPORAN.md` + `DEPLOY-UCF-LAPORAN.md`
 - **Artefak:** `dist/` siap deploy, `ucf-audit/stage8/phase-8.json`, screenshots
 
 ---
 
-## 7. Deploy Vercel
+## 7. Deploy Vercel — ✅ LIVE
 
 - **Project:** `ucf-universal-character-foundry` (`prj_kR9OTsmBN1l4wPhmp0RmYGVYHojA`) — framework `vite`, `npm run build`, `dist`, `legacy-peer-deps`
 - **Team:** `JHK` (`team_4Crq4DFnsMj6qWX04cAZUrdg`) — owner `mh5832770@gmail.com`
-- **Status:** Project created 20 Okt 2026. **Deployment file 1.02 MB melebihi batas payload tool** → deployment via API file-array ditunda; solusi: push ke GitHub + `git_source` atau deploy via `vercel --prod --token`.
-- **Langkah selanjutnya:** `git remote add origin` ke GitHub baru, `git push`, lalu `vercel__create_deployment` dengan `git_source: {type:"github", ref:"master", repoId:"..."}` atau jalankan `npx vercel --prod` lokal dengan token. Lihat `DEPLOY-UCF-LAPORAN.md`.
+- **URL publik:** **https://ucf-universal-character-foundry.vercel.app** — `HTTP 200`, `content-type text/html`, `x-vercel-id pdx1::...` — `ssoProtection:null` (awal protected, sudah di-patch)
+- **Repo:** https://github.com/siluman-mati/ucf-universal-character-foundry — push `master ffaa55f` + tags sukses
+- **Deployment:** 2× via `npx vercel --prod --token $VERCEL_TOKEN` (4.7 MB upload, build `iad1` 12–14 s, vite 456 ms) — Production alias `https://ucf-universal-character-foundry-79jgr5cql-jhk14.vercel.app` + `https://ucf-universal-character-foundry.vercel.app`
+- **Verifikasi:** `curl -I` 200, `fetch_page` `<title>Universal Character Foundry — Tahap 7</title>` + `assets/index-DALRa_dZ.js` — identik dengan `dist/` lokal. Lihat `DEPLOY-UCF-LAPORAN.md`.
 
 ---
 
