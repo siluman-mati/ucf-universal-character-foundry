@@ -83,6 +83,23 @@ export class ExportPanel {
     let clone;
     try {
       clone = src.clone(true);
+      // Rebind skeleton: SkinnedMesh.clone() keeps reference to original bones, not cloned ones → joint indices invalid (isBone error).
+      // Bangun peta nama→bone clone, lalu buat Skeleton baru untuk tiap SkinnedMesh.
+      const boneByName = new Map();
+      clone.traverse(o=>{ if(o.isBone) boneByName.set(o.name, o); });
+      // juga kumpulkan original bones untuk urutan
+      clone.traverse(o=>{
+        if(o.isSkinnedMesh && o.skeleton){
+          const origBones = o.skeleton.bones || [];
+          const clonedBones = origBones.map(b=> boneByName.get(b.name)).filter(Boolean);
+          if(clonedBones.length && clonedBones.length===origBones.length){
+            const THREE = o.skeleton.constructor ? null : null; // placeholder to avoid lint
+            // buat skeleton baru dengan boneInverses asli
+            const newSkeleton = new o.skeleton.constructor(clonedBones, o.skeleton.boneInverses);
+            o.bind(newSkeleton, o.bindMatrix.clone());
+          }
+        }
+      });
     } finally {
       src.userData.ucfRig = savedRig;
       for (const [o, rig] of savedExtras) o.userData.ucfRig = rig;
@@ -133,7 +150,11 @@ export class ExportPanel {
       const { report, root, animations } = await importModelFile(file);
       // bandingkan dengan humanoid asal (sebelum ekspor)
       const before = this.humanoid.entries.get(this.humanoid.selectedModelId) || this.entryToExport();
-      const beforeStats = before?.stats || {};
+      let beforeStats = before?.stats || {};
+      if (!beforeStats.meshes) {
+        const vm = this.viewport.modelById?.(before?.modelId) || this.viewport.models?.find(m=>m.name===before?.name) || this.viewport.models?.[0];
+        if (vm?.stats?.meshes) beforeStats = vm.stats;
+      }
       const afterStats = report.stats || {};
       const meshOk = beforeStats.meshes === afterStats.meshes || (Math.abs((beforeStats.meshes||0) - (afterStats.meshes||0)) <= 2);
       const bonesOk = (beforeStats.bones||0) === (afterStats.bones||0) || (afterStats.bones||0) >= (beforeStats.bones||0)-2;

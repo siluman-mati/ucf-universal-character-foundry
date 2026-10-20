@@ -1,7 +1,7 @@
 {
   "name": "ucf-universal-character-foundry",
   "private": true,
-  "version": "1.1.0-stage7",
+  "version": "1.1.0-stage8",
   "description": "Universal Character Foundry v1.1 — Tahap 5: animasi, retargeting, dan pengujian deformasi",
   "type": "module",
   "license": "UNLICENSED",
@@ -11,13 +11,15 @@
     "preview": "vite preview --host 0.0.0.0",
     "serve": "node scripts/serve.mjs",
     "test": "node --test",
-    "test:e2e": "node tests/e2e-stage1.mjs && node tests/e2e-stage2.mjs && node tests/e2e-stage3.mjs && node tests/e2e-stage4.mjs && node tests/e2e-stage5.mjs && node tests/e2e-stage6.mjs && node tests/e2e-stage7.mjs"
+    "test:e2e": "node tests/e2e-stage1.mjs && node tests/e2e-stage2.mjs && node tests/e2e-stage3.mjs && node tests/e2e-stage4.mjs && node tests/e2e-stage5.mjs && node tests/e2e-stage6.mjs && node tests/e2e-stage7.mjs && node tests/e2e-stage8.mjs"
   },
   "dependencies": {
     "three": "0.180.0"
   },
   "devDependencies": {
-    "vite": "8.3.3",
-    "playwright": "1.64.1"
+    "@gltf-transform/cli": "^4.5.1",
+    "@gltf-transform/core": "^4.5.1",
+    "playwright": "1.64.1",
+    "vite": "8.3.3"
   }
 }
