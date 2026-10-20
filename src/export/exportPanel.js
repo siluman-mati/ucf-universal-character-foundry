@@ -94,6 +94,15 @@ export class ExportPanel {
       if (o.userData?.ucfProcedural) delete o.userData.ucfProcedural;
       if (o.userData?.ucfCharacterId) delete o.userData.ucfCharacterId;
     });
+    // hanya modul terlihat yang diekspor — hormati `visible` modul (aturan 3)
+    // dan pastikan helper viewport tidak ikut (sudah terpisah, tapi jaga-jaga)
+    const toRemove = [];
+    clone.traverse((o) => {
+      if (o.userData?.ucfHelper) toRemove.push(o);
+      // modul invisible: geometry tetap ada tapi visible=false — keluarkan dari ekspor
+      if (o.visible === false && o.isMesh) toRemove.push(o);
+    });
+    for (const r of toRemove) r.parent?.remove(r);
     clone.name = entry.name;
     clone.position.set(0,0,0);
     clone.rotation.set(0,0,0);

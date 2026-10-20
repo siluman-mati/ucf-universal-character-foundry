@@ -6,6 +6,7 @@
 export async function exportGLB(object, { binary = true, animations = [] } = {}) {
   const { GLTFExporter } = await import('three/addons/exporters/GLTFExporter.js');
   const exporter = new GLTFExporter();
+  // onlyVisible:false — kita sudah filter invisible modul di buildExportClone, jadi tidak menggandakan filter GLTFExporter
   const glb = await new Promise((resolve, reject) => {
     exporter.parse(
       object,
