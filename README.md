@@ -1,11 +1,14 @@
-# Universal Character Foundry (UCF) v1.1 — Tahap 4
+# Universal Character Foundry (UCF) v1.1 — Tahap 5
 
 Aplikasi web mandiri untuk pembuatan karakter 3D. **Tahap 1** mencakup viewport 3D,
 kontrol kamera, helper tampilan, hierarki objek, dan impor GLB/glTF; **Tahap 2** menambah
 humanoid prosedural 35 parameter; **Tahap 3** menambah skeleton 51 tulang sampai ruas jari,
 skin weights, dan pengujian deformasi; **Tahap 4** menambah sistem modular karakter
 (library 18 modul, validasi kompatibilitas 13 pemeriksaan, pasang/lepas/ganti, material,
-visibilitas, dan simpan/muat config). Proyek terpisah dari rigPro A.0 dan tidak mengubahnya.
+visibilitas, dan simpan/muat config); **Tahap 5** menambah animasi: 5 klip native yang
+di-bake dengan foot grounding, pemutaran klip model impor, retargeting dengan pemetaan
+tulang eksplisit (peran + hierarki + sisi dunia, bukan nama), dan pengukuran deformasi
+dari verteks hasil skinning. Proyek terpisah dari rigPro A.0 dan tidak mengubahnya.
 
 ## Yang sudah berfungsi pada tahap ini
 
@@ -21,6 +24,15 @@ visibilitas, dan simpan/muat config). Proyek terpisah dari rigPro A.0 dan tidak 
   pemilihan via klik hierarki atau raycast di viewport.
 - Log validasi **PASS / FAIL / NOT TESTED / BLOCKED** dengan nama tes, model, error,
   peringatan, waktu, dan detail teknis; dapat diunduh sebagai JSON.
+- **Animasi (Tahap 5):** panel "8 · Animasi" berisi 5 klip native (idle 2,4 s, walk 1,0 s,
+  run 0,72 s, jump 1,2 s, wave 2,0 s), kontrol putar/jeda/stop/reset pose, loop, kecepatan,
+  timeline, dan tombol **Uji animasi** yang mengukur 10 hal dari geometri: lantai, kaki
+  bergantian, drift panggul, loop, lutut, tangan, kepala, regangan mesh, lengan tidak kaku
+  T-pose, serta pakaian modular mengikuti deformasi.
+- **Retargeting (Tahap 5):** pilih model impor beranimasi → **Buat peta tulang** → tabel
+  pasangan eksplisit + 6 pemeriksaan kualitas → **Retarget & muat**. Hasil retarget
+  di-grounding (contact/clamp) dan diverifikasi dua cara: deviasi arah tulang terhadap pose
+  yang diharapkan, dan korelasi lintasan tangan/kaki terhadap klip sumber.
 - Tata letak responsif: panel menjadi drawer pada lebar ≤ 980 px, diuji pada 390×844.
 
 ## Menjalankan
@@ -41,12 +53,13 @@ di sesi baru. Browser untuk Playwright juga perlu dipasang ulang:
 ## Tes
 
 ```bash
-npm test                              # 52 tes unit (17 viewport/impor + 12 humanoid + 8 rig + 15 modular)
+npm test                              # 63 tes unit (17 viewport/impor + 12 humanoid + 8 rig + 15 modular + 11 animasi)
 node scripts/serve.mjs 4173 &         # setelah npm run build
 node tests/e2e-stage1.mjs             # 42 cek browser Tahap 1
 node tests/e2e-stage2.mjs             # 18 cek browser humanoid (2a+2b+2c)
 node tests/e2e-stage3.mjs             # 15 cek browser rigging & deformasi
 node tests/e2e-stage4.mjs             # 21 cek browser sistem modular
+node tests/e2e-stage5.mjs             # 20 cek browser animasi & retargeting
 ```
 
 E2E menulis `../ucf-audit/stage1-e2e.json` dan `../ucf-audit/screenshots/*.png`
@@ -129,14 +142,59 @@ Seksi 7 di panel kanan menyimpan library modul dan daftar modul terpasang.
   visibilitas, material, transform, status validasi, metadata sumber, dan manifest impor.
   Muat config memasang ulang modul melalui `reattachAll()`.
 
+## Tahap 5 — animasi, retargeting, dan pengujian deformasi
+
+Seksi 8 di panel kanan berisi pemutar animasi dan panel retargeting.
+
+- **5 klip native** yang di-bake 30 fps dari pose parametrik: `idle` 2,4 s (contact),
+  `walk` 1,0 s (contact), `run` 0,72 s (align), `jump` 1,2 s (clamp), `wave` 2,0 s (contact).
+  Setiap klip menulis track kuaternion untuk **seluruh 51 tulang** + track posisi panggul,
+  dengan koreksi ketinggian panggul per frame sehingga telapak menapak lantai tanpa membuat
+  badan mengambang. `walk`: telapak −0,0024 … +0,0023 m, drift panggul 0 m.
+- **Pemutaran klip model impor** (XBot 7 klip) dan **klip hasil retarget**, satu mixer dengan
+  kontrol putar/jeda/stop, seek, loop, dan kecepatan 0,25–2,0×.
+- **Pemetaan tulang eksplisit**, bukan berbasis nama: peran tulang dideteksi dari geometri
+  (panggul = leluhur bersama dua daun terendah, rantai batang, klavikula→tangan, lima rantai
+  jari, sisi dari posisi dunia). Hasil pada XBot: **50 pasangan** dari 67 tulang sumber,
+  sementara pencocokan nama mentah hanya menemukan **4**. Enam pemeriksaan kualitas:
+  cakupan peran inti, konsistensi hierarki, konsistensi sisi, kecocokan rest relatif,
+  konflik label sisi, dan pembanding nama-saja.
+- Konvensi sisi dicatat jujur: Mixamo menamai tulang `Left*` pada sumbu **+X**, UCF menamai
+  `_R` pada +X. Pasangan tetap memakai **sisi dunia**, dan 44 konflik label dilaporkan
+  sebagai "konvensi-label", bukan dianggap kesalahan struktur.
+- **Retarget**: rotasi dunia sumber dipindahkan setelah disejajarkan dengan bind pose target
+  (`alignment: 'rest'`), translasi panggul diskalakan (`hipScale` 0,871) dan root motion
+  dibuang (in-place). Hasil di-grounding otomatis (`contact` bila rentang titik terendah
+  < 60 mm) — telapak yang semula −0,0535 m menjadi 0,0000 m.
+- **Verifikasi retarget dua cara**: (1) deviasi arah tulang pose aktual hasil mixer terhadap
+  pose yang diharapkan → 0,00° rata-rata/terburuk; (2) korelasi lintasan ujung tangan/kaki
+  relatif panggul terhadap klip sumber → minimum 0,926.
+- **Uji animasi** mengukur dari **verteks setelah skinning**, 10 pemeriksaan: `lantai`,
+  `bergantian`, `panggul`, `loop`, `lutut`, `tangan`, `kepala`, `regangan`, `lengan`,
+  `modul`. Cek `lengan` menangkap pose yang kaku di T-pose (sudut lengan minimum terhadap
+  arah bawah; T-pose = 90°, ambang 65°).
+- **Modul ikut deformasi**: verteks modul dipasangkan dengan verteks tubuh bertulang dominan
+  yang sama (bukan "tetangga terdekat" yang bisa berpindah kaki). Perubahan jarak maksimum
+  15,1 mm (retarget walk) / 21,1 mm (native walk) dari ambang 30 mm.
+- **Reset pose** selalu kembali ke bind pose karakter yang disimpan di `rig.restPose`
+  (delta kuaternion 0, delta verteks 0 m), bukan ke pose yang kebetulan aktif saat klip dimuat.
+- `skinGeometryForRig()` dan generator modul selalu dihitung di bind pose, sehingga memasang
+  modul saat karakter sedang beranimasi tidak menghasilkan bobot atau posisi yang salah.
+
 ## Batasan saat ini (jangan diklaim lebih)
 
 - Bentuk manekin masih kasar (tanpa tekstur/wajah, tanpa rig wajah); kualitas visual belum final
   dan **bukan topology siap produksi**.
 - Belum ada IK, kontrol rig, atau auto-rig untuk model eksternal; rig hanya untuk humanoid
   prosedural UCF.
-- Deformasi diuji secara numerik (perpindahan verteks) dan lewat screenshot; belum ada
-  pengujian animasi/klip (Tahap 5).
+- Animasi diuji secara numerik (deformasi verteks) **dan** lewat screenshot. **Belum ada
+  simulasi kain** — pakaian hanya mengikuti skinning.
+- **Retarget hanya dibuktikan pada satu sumber uji (XBot/Mixamo).** Model tanpa rig, rig
+  non-humanoid, VRM, dan skeleton dengan konvensi lain belum diuji; kompatibilitas model luar
+  menyeluruh adalah lingkup Tahap 6.
+- Root motion dibuang (in-place); opsi mempertahankannya ada di kode tetapi belum diuji e2e.
+- Klip native adalah hasil bake pose parametrik, bukan animasi hasil capture; kualitas
+  gerak masih sederhana (tanpa IK kaki, tanpa offset per-tulang klavikula).
 - Nilai parameter 3 desimal; slider memakai langkah 0,001 m agar nilai default dapat
   dikembalikan persis.
 - Modul pakaian/aksesori masih prosedural tanpa tekstur; belum ada simulasi kain,
@@ -146,7 +204,8 @@ Seksi 7 di panel kanan menyimpan library modul dan daftar modul terpasang.
   ini heuristik, bukan jaminan bebas penetrasi di semua pose.
 - Satu slot untuk `skin/face/hair/tops/bottoms/shoes`; aksesori boleh lebih dari satu.
   Transform modul hanya untuk tipe `bone`/`static`, bukan `skinned`.
-- Belum ada animasi/retargeting maupun ekspor. Klip animasi hanya **dihitung**, belum diputar.
+- Belum ada ekspor GLB/FBX/VRM (Tahap 7) — tidak ada tombol ekspor di UI karena fiturnya
+  belum ada.
 - Hanya GLB/glTF. FBX/VRM ditolak dengan pesan eksplisit.
 - Draco dan KTX2/Basis Universal belum didukung → impor **BLOCKED** dengan alasan.
   Material `KHR_materials_pbrSpecularGlossiness` dilaporkan sebagai peringatan.
