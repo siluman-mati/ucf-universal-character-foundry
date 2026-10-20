@@ -15,6 +15,7 @@ import { ExportPanel } from './export/exportPanel.js';
 import { generateFromImageFile, listEngines } from './imageTo3D/engine.js';
 import { autoRigImageMesh, getImageRig } from './imageTo3D/rigAdapter.js';
 import { summarize } from './stats.js';
+import { findConnectedComponents, singleViewRequirements, createCropperUI } from './imageTo3D/cropper.js';
 
 const $ = (selector) => document.querySelector(selector);
 const ui = {
@@ -36,6 +37,15 @@ const ui = {
   testImageDeform: $('#testImageDeform'),
   imageReport: $('#imageReport'),
   imageTo3DStatus: $('#imageTo3DStatus'),
+  imageCropWrap: $('#imageCropWrap'),
+  imageCropper: $('#imageCropper'),
+  cropInfo: $('#cropInfo'),
+  cropAutoDetect: $('#cropAutoDetect'),
+  cropApply: $('#cropApply'),
+  cropReset: $('#cropReset'),
+  cropComponents: $('#cropComponents'),
+  imageConsent: $('#imageConsent'),
+  consentRemote: $('#consentRemote'),
   hierarchyTree: $('#hierarchyTree'),
   hierarchySearch: $('#hierarchySearch'),
   hierarchyCount: $('#hierarchyCount'),
@@ -77,7 +87,12 @@ const state = {
   lastImageFile: null,
   lastImageGroup: null,
   lastImageMeta: null,
-  lastImageModelId: null
+  lastImageModelId: null,
+  lastImageCanvas: null, // canvas sumber untuk cropper
+  lastCropRect: null, // {x,y,w,h} pilihan user
+  cropper: null,
+  lastMask: null,
+  lastComponents: null
 };
 let booted = false;
 let pendingViewsRecord = false;
@@ -616,17 +631,24 @@ function updateImageUIState() {
   const hasModel = !!state.lastImageModelId && viewport.modelById(state.lastImageModelId);
   const mode = ui.imageEngine?.value || 'silhouette';
   const isRemote = mode !== 'silhouette';
-  if (ui.generate3D) ui.generate3D.disabled = !hasImage || isRemote;
-  if (ui.generate3D && isRemote) ui.generate3D.title = 'Mesin ini butuh server GPU — belum tersedia lokal';
-  else if (ui.generate3D) ui.generate3D.title = '';
+  const hasConsent = !isRemote || ui.consentRemote?.checked;
+  if (ui.generate3D) {
+    ui.generate3D.disabled = !hasImage || (isRemote && !hasConsent);
+    if (isRemote && !hasConsent) ui.generate3D.title = 'Centang persetujuan kirim ke HF Space dulu';
+    else if (isRemote) ui.generate3D.title = 'Akan kirim crop ke ' + mode + ' — butuh network, bisa gagal 503';
+    else ui.generate3D.title = 'Silhouette lokal — hanya untuk logo/ikon, bukan karakter volumetrik';
+  }
   if (ui.clearImage) ui.clearImage.disabled = !hasImage;
   if (ui.autoRigImage) ui.autoRigImage.disabled = !hasModel;
   if (ui.testImageDeform) ui.testImageDeform.disabled = !hasModel;
+  if (ui.imageConsent) ui.imageConsent.classList.toggle('hidden', !isRemote);
   if (ui.imageTo3DStatus) {
     if (!hasImage) ui.imageTo3DStatus.textContent = 'belum ada gambar';
-    else if (isRemote) ui.imageTo3DStatus.textContent = `mode ${mode} — butuh server`;
-    else ui.imageTo3DStatus.textContent = hasModel ? 'mesh 3D siap' : 'gambar siap';
+    else if (isRemote && !hasConsent) ui.imageTo3DStatus.textContent = `mode ${mode} — perlu persetujuan`;
+    else if (isRemote) ui.imageTo3DStatus.textContent = `mode ${mode} — siap kirim`;
+    else ui.imageTo3DStatus.textContent = hasModel ? 'mesh 3D siap (sederhana)' : 'gambar siap (silhouette)';
   }
+  if (ui.imageCropWrap) ui.imageCropWrap.classList.toggle('hidden', !hasImage);
 }
 
 function renderImagePreview(file, previewUrl) {
@@ -662,14 +684,52 @@ function renderImageReport(meta) {
 async function handleImageSelect(file) {
   if (!file || !isImageFile(file)) return;
   state.lastImageFile = file;
+  state.lastCropRect = null;
   // preview
   const previewUrl = URL.createObjectURL(file);
   renderImagePreview(file, previewUrl);
-  // revoke later? keep for session
-  if (ui.imageReport) ui.imageReport.innerHTML = `<p class="hint">Gambar dimuat. Pilih mesin lalu tekan "Buat mesh 3D dari gambar".</p>`;
+  // Tahap 3: siapkan cropper untuk sheet multi-karakter
+  try {
+    const { loadImageToCanvas, createMaskFromCanvas } = await import('./imageTo3D/imageLoader.js');
+    const loaded = await loadImageToCanvas(file);
+    state.lastImageCanvas = loaded.canvas; // simpan untuk cropper
+    const masked = createMaskFromCanvas(loaded.canvas, loaded.ctx);
+    state.lastMask = masked;
+    const comps = findConnectedComponents(masked.mask, masked.w, masked.h);
+    state.lastComponents = comps;
+    if (ui.cropComponents) {
+      if (comps.length > 1) {
+        ui.cropComponents.innerHTML = `Terdeteksi ${comps.length} komponen terhubung (mungkin sheet multi-karakter). <b>Jangan proses seluruh lembar sebagai satu siluet — akan bertumpuk gepeng.</b> Pilih satu: ` + comps.slice(0,4).map((c,i)=> `<button class="btn small crop-suggest" data-idx="${i}" type="button">Karakter ${i+1} (${c.width}×${c.height}, ${(c.areaRatio*100).toFixed(1)}%)</button>`).join(' ');
+      } else if (comps.length===1) {
+        ui.cropComponents.innerHTML = `Terdeteksi 1 komponen (${(comps[0].areaRatio*100).toFixed(1)}% area). Jika ini sheet, potong manual dengan seret kotak.`;
+      } else ui.cropComponents.innerHTML = '';
+    }
+    // inisialisasi cropper UI dengan full rect
+    if (ui.imageCropper && loaded.canvas) {
+      const rectFull = { x:0, y:0, w:loaded.canvas.width, h:loaded.canvas.height };
+      // jika ada bbox terbesar, usulkan sebagai awal
+      const suggest = comps[0] ? { x: comps[0].minX, y: comps[0].minY, w: comps[0].width, h: comps[0].height } : rectFull;
+      state.cropper = createCropperUI(ui.imageCropper, loaded.canvas, suggest);
+      state.lastCropRect = state.cropper.rect;
+      state.cropper.onChange((r)=> {
+        state.lastCropRect = r;
+        if (ui.cropInfo) ui.cropInfo.textContent = `${r.w}×${r.h} @${r.x},${r.y}`;
+        // persyaratan single-view
+        const reqs = singleViewRequirements(ui.imageEngine?.value||'tripoRemote');
+        if (r && (Math.abs(r.w - r.h) > Math.min(r.w,r.h)*0.3)) {
+          if (ui.cropInfo) ui.cropInfo.textContent += ' — ideal persegi 1:1 untuk TripoSR';
+        }
+      });
+      if (ui.cropInfo) ui.cropInfo.textContent = `${suggest.w}×${suggest.h} @${suggest.x},${suggest.y}`;
+    }
+    const reqs = singleViewRequirements(ui.imageEngine?.value||'tripoRemote');
+    if (reqs.length && ui.imageReport) {
+      ui.imageReport.innerHTML = `<div class="hint mono" style="font-size:11px"><b>Persyaratan single-view (${ui.imageEngine?.value||'tripoRemote'}):</b><ul class="warn-list">${reqs.map(r=>`<li>${escapeHtml(r)}</li>`).join('')}</ul><p>Potongan saat ini: ${state.lastCropRect.w}×${state.lastCropRect.h} — akan dikirim sebagai input rekonstruksi (bukan seluruh sheet).</p></div>`;
+    } else if (ui.imageReport) ui.imageReport.innerHTML = `<p class="hint">Gambar dimuat. Atur potongan (drag kotak) untuk memilih 1 karakter, lalu pilih mesin dan tekan Buat mesh. Silhouette hanya untuk logo/ikon.</p>`;
+  } catch(e) { console.warn('cropper init fail', e); if (ui.imageReport) ui.imageReport.innerHTML = `<p class="hint">Gambar dimuat. Pilih mesin lalu tekan Buat mesh 3D.</p>`; }
   updateImageUIState();
-  setStatus(`Gambar dimuat: ${file.name} — siap generasi 3D.`, 'ok');
-  log.add({ group: 'H. Gambar→3D', test: 'Gambar dimasukkan', model: file.name, result: RESULT.PASS, details: { ukuran: file.size, tipe: file.type, metode_deteksi: 'image/*' } });
+  setStatus(`Gambar dimuat: ${file.name} — atur potongan 1 karakter, lalu generasi.`, 'ok');
+  log.add({ group: 'H. Gambar→3D', test: 'Gambar dimasukkan', model: file.name, result: RESULT.PASS, details: { ukuran: file.size, tipe: file.type, metode_deteksi: 'image/*', komponen: state.lastComponents?.length||0, crop_saran: state.lastCropRect? `${state.lastCropRect.w}×${state.lastCropRect.h}`:'penuh' } });
   renderValidation();
 }
 
@@ -677,19 +737,48 @@ async function handleGenerateImage3D() {
   const file = state.lastImageFile;
   const mode = ui.imageEngine?.value || 'silhouette';
   if (!file) { setStatus('Belum ada gambar — pilih PNG/JPG dulu.', 'error'); return; }
-  if (mode !== 'silhouette') {
-    const msg = `Mesin ${mode} butuh server GPU terpisah (lihat docs/AUDIT-IMAGE-TO-3D.md). Belum tersedia lokal.`;
-    if (ui.imageReport) ui.imageReport.innerHTML = `<div class="report-head blocked"><span class="dot"></span><strong>Butuh server GPU</strong></div><div class="report-body"><p class="error-msg">${escapeHtml(msg)}</p><p class="hint">Pilih "Silhouette Extrude (lokal)" untuk bukti lokal tanpa GPU. Untuk TripoSR/TRELLIS siapkan server: clone repo, jalankan \`python run.py\` di GPU 6GB+/24GB, lalu ubah engine.js untuk fetch GLB.</p></div>`;
-    log.add({ group: 'H. Gambar→3D', test: 'Proses generasi (remote)', model: file.name, result: RESULT.BLOCKED, errors: [msg], details: { mode, engine: mode, catatan: 'Butuh server GPU terpisah, bukan klaim lokal' } });
-    renderValidation();
-    setStatus(msg, 'error');
-    return;
+  const isRemote = mode !== 'silhouette';
+  // Tahap 4: tampilkan status sebenarnya, jangan klaim sukses jika hanya fallback
+  const cropRect = state.lastCropRect; // dari cropper Tahap 3 — jangan gabung beberapa karakter menjadi satu mesh
+  if (isRemote) {
+    if (!ui.consentRemote?.checked) {
+      const msg = `Centang persetujuan: gambar crop ${cropRect? `${cropRect.w}×${cropRect.h}`:'penuh'} akan dikirim ke huggingface.co/spaces/stabilityai/TripoSR (atau server ${mode}) untuk inferensi. Tanpa persetujuan tidak dikirim.`;
+      setStatus(msg, 'error');
+      if (ui.imageReport) ui.imageReport.innerHTML = `<div class="report-head blocked"><span class="dot"></span><strong>Butuh persetujuan</strong></div><div class="report-body"><p class="error-msg">${escapeHtml(msg)}</p><p class="hint">Kebutuhan: GPU 6GB VRAM, Python+CUDA, model 1GB. Jika tidak ada server, status akan GAGAL/BELUM TERVERIFIKASI — bukan sukses palsu.</p></div>`;
+      return;
+    }
+    setBusy(true, `TripoSR remote: mengirim ${file.name} (${cropRect? `${cropRect.w}×${cropRect.h} crop`: 'penuh'})…`);
+    setStatus(`Mengirim ke ${mode}… (TripoSR hallucinate belakang, 30–60s) — jangan tutup tab`);
+    try {
+      const { generateFromImageFile: genRemote } = await import('./imageTo3D/engine.js');
+      const onProgress = (p)=> {
+        if (ui.imageReport) ui.imageReport.innerHTML = `<div class="report-head"><span class="dot"></span><strong>${escapeHtml(p.stage||'remote')} — ${escapeHtml(p.msg||p.server||'')}</strong></div><div class="report-body"><pre class="mono" style="font-size:11px;white-space:pre-wrap">${escapeHtml(JSON.stringify(p,null,2))}</pre></div>`;
+        setStatus(`${p.stage}: ${p.msg||p.server||''}`, 'ok');
+      };
+      const remoteRes = await genRemote(file, { mode, cropRect, tryRemote:true, serverUrl: null, onProgress });
+      // remoteRes.group adalah GLB terinferensi (volumetrik), bukan placeholder/manikin
+      const group = remoteRes.group;
+      const stats = summarize(group, { clips: [] });
+      const model = viewport.addModel(group, { name: group.name, fileName: file.name, stats, clips: [], report: { fileName: file.name, format: 'image-to-3D-triposr', bytes: file.size, loadMs: 0, stats, warnings: ['Hasil TripoSR — volume nyata, bukan ekstrusi. Cek dari depan/samping/belakang.'], extensions:{used:[]} } });
+      viewport.fitAll({ animate:true });
+      state.lastImageGroup=group; state.lastImageMeta=remoteRes.meta; state.lastImageModelId=model.id;
+      renderImageReport({ ok:true, fileName:file.name, engine: mode+' (TripoSR HF Space)', meshInfo:{ vertices: remoteRes.meta.meshInfo.vertices, triangles:0, size: remoteRes.meta.meshInfo.size, is3D:true }, depth:1, worldW:0, worldH:0, timings:{totalMs:0}, warnings:['Volumetrik TripoSR — cek 360°'], bbox:{areaRatio:0}, maskInfo:{method:'triposr-infer'} });
+      log.add({ group:'H. Gambar→3D', test:'Rekonstruksi TripoSR (remote)', model:file.name, result:RESULT.PASS, details:{ engine: mode, server: remoteRes.meta.server, verteks: remoteRes.meta.meshInfo.vertices, volumetrik:'ya — belakang di-hallucinate', crop: cropRect? `${cropRect.w}×${cropRect.h} @${cropRect.x},${cropRect.y}`:'penuh', glbUrl: remoteRes.gltf? 'loaded':'pending' } });
+      renderValidation(); setStatus(`TripoSR berhasil: ${remoteRes.meta.meshInfo.vertices} verteks volumetrik — periksa depan/samping/belakang/360°`, 'ok');
+      return;
+    } catch(e) {
+      const msg = e.message || String(e);
+      if (ui.imageReport) ui.imageReport.innerHTML = `<div class="report-head fail"><span class="dot"></span><strong>Gagal remote — GAGAL DI LINGKUNGAN INI</strong></div><div class="report-body"><p class="error-msg">${escapeHtml(msg)}</p><p class="hint">TripoSR Space saat ini down (runtime scikit-build-core) atau tanpa GPU. Status: BELUM TERVERIFIKASI — bukan sukses palsu. Alternatif: self-host TripoSR (git clone VAST-AI-Research/TripoSR, 6GB VRAM) atau gunakan Silhouette untuk logo sederhana.</p><p class="hint">Jangan menampilkan sukses jika hanya fallback silhouette — pilih silhouette secara eksplisit jika mau.</p></div>`;
+      log.add({ group:'H. Gambar→3D', test:'Rekonstruksi TripoSR (remote)', model:file.name, result:RESULT.FAIL, errors:[msg], details:{ mode, crop: cropRect? `${cropRect.w}×${cropRect.h}`:'penuh', server: 'huggingface.co/spaces/stabilityai/TripoSR', status:'GAGAL DI LINGKUNGAN INI — Space down / no GPU' } });
+      renderValidation(); setStatus(`Remote gagal: ${msg} — bukan fallback, tandai GAGAL`, 'error');
+      return;
+    } finally { setBusy(false); }
   }
   setBusy(true, `Membuat mesh 3D dari ${file.name}…`);
   setStatus(`Membuat mesh 3D dari gambar ${file.name}…`);
   try {
     const t0 = performance.now();
-    const { group, mesh, meta } = await generateFromImageFile(file, { mode });
+    const { group, mesh, meta } = await generateFromImageFile(file, { mode, cropRect });
     // Hitung stats via summarize untuk konsistensi dengan model lain
     const stats = summarize(group, { clips: [] });
     // viewport expects bbox size etc — summarize sudah hitung
@@ -741,11 +830,20 @@ async function handleGenerateImage3D() {
 function handleClearImage() {
   state.lastImageFile = null;
   state.lastImageMeta = null;
+  state.lastImageCanvas = null;
+  state.lastCropRect = null;
+  state.lastMask = null;
+  state.lastComponents = null;
+  if (state.cropper) { try{ state.cropper.destroy(); }catch{} state.cropper=null; }
   if (ui.imagePreview) ui.imagePreview.src = '';
   if (ui.imagePreviewWrap) ui.imagePreviewWrap.classList.add('hidden');
+  if (ui.imageCropWrap) ui.imageCropWrap.classList.add('hidden');
   if (ui.imagePreviewInfo) ui.imagePreviewInfo.textContent = '';
+  if (ui.cropComponents) ui.cropComponents.innerHTML='';
+  if (ui.cropInfo) ui.cropInfo.textContent='belum dipotong';
   if (ui.imageReport) ui.imageReport.innerHTML = '';
   if (ui.imageFile) ui.imageFile.value = '';
+  if (ui.consentRemote) ui.consentRemote.checked=false;
   updateImageUIState();
   setStatus('Gambar dihapus.', 'ok');
 }
@@ -983,11 +1081,56 @@ if (ui.imageFile) {
     }
   });
 }
-if (ui.imageEngine) ui.imageEngine.addEventListener('change', updateImageUIState);
+if (ui.imageEngine) ui.imageEngine.addEventListener('change', () => {
+  updateImageUIState();
+  // tampilkan ulang persyaratan single-view jika gambar sudah ada
+  if (state.lastImageFile && ui.imageReport) {
+    const reqs = singleViewRequirements(ui.imageEngine.value);
+    if (reqs.length) ui.imageReport.innerHTML = `<div class="hint mono" style="font-size:11px"><b>Persyaratan single-view (${ui.imageEngine.value}):</b><ul class="warn-list">${reqs.map(r=>`<li>${escapeHtml(r)}</li>`).join('')}</ul></div>`;
+  }
+});
 if (ui.generate3D) ui.generate3D.addEventListener('click', handleGenerateImage3D);
 if (ui.clearImage) ui.clearImage.addEventListener('click', handleClearImage);
 if (ui.autoRigImage) ui.autoRigImage.addEventListener('click', handleAutoRig);
 if (ui.testImageDeform) ui.testImageDeform.addEventListener('click', handleTestImageDeform);
+if (ui.consentRemote) ui.consentRemote.addEventListener('change', updateImageUIState);
+if (ui.cropAutoDetect) ui.cropAutoDetect.addEventListener('click', async() => {
+  if (!state.lastMask) return;
+  const comps = state.lastComponents || findConnectedComponents(state.lastMask.mask, state.lastMask.w, state.lastMask.h);
+  if (!comps.length) { setStatus('Tidak ada komponen terdeteksi untuk auto-detect', 'error'); return; }
+  // tampilkan pilihan & set ke terbesar
+  const best = comps[0];
+  if (state.cropper) state.cropper.setRect({ x: best.minX, y: best.minY, w: best.width, h: best.height });
+  state.lastCropRect = { x: best.minX, y: best.minY, w: best.width, h: best.height };
+  if (ui.cropInfo) ui.cropInfo.textContent = `Auto: Karakter 1 ${best.width}×${best.height} @${best.minX},${best.minY} — ${comps.length} komponen`;
+  if (ui.cropComponents) ui.cropComponents.innerHTML = `Auto-detect: ${comps.length} komponen — terbesar dipakai. Klik saran di bawah untuk ganti. ` + comps.slice(0,4).map((c,i)=> `<button class="btn small crop-suggest" data-idx="${i}" type="button">K${i+1} ${c.width}×${c.height}</button>`).join(' ');
+  setStatus(`Auto-detect: ${best.width}×${best.height} — gunakan potongan ini`, 'ok');
+});
+if (ui.cropApply) ui.cropApply.addEventListener('click', () => {
+  if (!state.cropper) { setStatus('Belum ada cropper — pilih gambar dulu', 'error'); return; }
+  state.lastCropRect = state.cropper.rect;
+  if (ui.cropInfo) ui.cropInfo.textContent = `Diterapkan ${state.lastCropRect.w}×${state.lastCropRect.h} @${state.lastCropRect.x},${state.lastCropRect.y}`;
+  setStatus(`Potongan diterapkan: ${state.lastCropRect.w}×${state.lastCropRect.h}`, 'ok');
+  updateImageUIState();
+});
+if (ui.cropReset) ui.cropReset.addEventListener('click', () => {
+  if (!state.lastImageCanvas || !state.cropper) return;
+  state.cropper.setRect({ x:0, y:0, w:state.lastImageCanvas.width, h:state.lastImageCanvas.height });
+  state.lastCropRect = state.cropper.rect;
+  if (ui.cropInfo) ui.cropInfo.textContent = `Reset penuh ${state.lastCropRect.w}×${state.lastCropRect.h}`;
+  setStatus('Crop reset ke penuh', 'ok');
+});
+if (ui.cropComponents) ui.cropComponents.addEventListener('click', (e) => {
+  const btn = e.target.closest('.crop-suggest');
+  if (!btn || !state.lastComponents) return;
+  const idx = parseInt(btn.dataset.idx,10);
+  const c = state.lastComponents[idx];
+  if (!c) return;
+  if (state.cropper) state.cropper.setRect({ x: c.minX, y: c.minY, w: c.width, h: c.height });
+  state.lastCropRect = { x: c.minX, y: c.minY, w: c.width, h: c.height };
+  if (ui.cropInfo) ui.cropInfo.textContent = `Pilih K${idx+1}: ${c.width}×${c.height} @${c.minX},${c.minY}`;
+  setStatus(`Memilih karakter ${idx+1}`, 'ok');
+});
 
 let dragDepth = 0;
 window.addEventListener('dragenter', (event) => {

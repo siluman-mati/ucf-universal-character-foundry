@@ -48,7 +48,7 @@
             <span id="imageTo3DStatus" class="count">belum ada gambar</span>
           </div>
           <p class="hint">
-            Unggah gambar karakter (PNG/JPG front-view, latar polos/putih). Mesin lokal <b>Silhouette Extrude</b> akan membuat mesh 3D bervolume (bukan plane) yang dapat diputar, di-rigging, dan diekspor GLB. Untuk rekonstruksi neural 360° (TripoSR/TRELLIS) butuh server GPU terpisah — lihat laporan audit.
+            Unggah gambar karakter <b>satu tampilan utama</b> (PNG/JPG front-view, tengah, latar polos/putih — lihat <code>docs/AUDIT-VOLUMETRIK-IMAGE-TO-3D.md</code>). <b>TripoSR (MIT, 6GB VRAM)</b> direkomendasikan untuk karakter bervolume; butuh server GPU atau HF Space gratis (gambar akan dikirim ke <code>huggingface.co/spaces/stabilityai/TripoSR</code> dengan persetujuan). <b>Silhouette Extrude</b> tetap tersedia sebagai opsi <i>sederhana</i> untuk logo/ikon, bukan karakter — hasilnya gepeng bertumpuk (punggung datar).
           </p>
           <div id="dropzoneImage" class="dropzone" tabindex="0" role="button" aria-label="Area impor gambar referensi">
             <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M12 3v11m0-11 4 4m-4-4-4 4M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3M8 10l2.2 2.6 2.8-3.6 3 4H8z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -60,15 +60,27 @@
             <img id="imagePreview" alt="Pratinjau gambar referensi" />
             <div id="imagePreviewInfo" class="hint mono"></div>
           </div>
+          <div id="imageCropWrap" class="hidden" style="margin-top:8px">
+            <div class="section-head" style="margin-bottom:6px"><span style="font-size:12px;font-weight:600">Potong karakter (sheet → satu view)</span><span class="count" id="cropInfo">belum dipotong</span></div>
+            <p class="hint mono" style="font-size:11px">Sheet dengan banyak karakter/view jangan diproses sebagai satu siluet — akan bertumpuk gepeng. Seret kotak untuk memilih 1 karakter (front-view). Klik deteksi otomatis untuk usulan.</p>
+            <div id="imageCropper" style="max-height:280px;overflow:auto;background:#0f1a25;border-radius:8px;padding:6px"></div>
+            <div class="row-buttons wrap" style="margin-top:6px">
+              <button id="cropAutoDetect" class="btn" type="button">Deteksi otomatis (usulan)</button>
+              <button id="cropApply" class="btn primary" type="button">Gunakan potongan ini</button>
+              <button id="cropReset" class="btn" type="button">Reset ke penuh</button>
+            </div>
+            <div id="cropComponents" class="hint mono" style="font-size:11px;margin-top:4px"></div>
+          </div>
           <label class="field">
             <span>Mesin generasi</span>
             <select id="imageEngine" class="select">
-              <option value="silhouette" selected>Silhouette Extrude (lokal, cepat) — mesh solid 3D</option>
-              <option value="tripoRemote">TripoSR (butuh server GPU — belum tersedia)</option>
-              <option value="trellisRemote">TRELLIS.2 (butuh server 24GB — belum tersedia)</option>
-              <option value="hunyuanRemote">Hunyuan3D (butuh server 16GB — belum tersedia)</option>
+              <option value="tripoRemote" selected>TripoSR (MIT, 6GB VRAM) — mesh volumetrik dari 1 gambar (rekomendasi)</option>
+              <option value="silhouette">Silhouette Extrude (lokal, sederhana — logo/ikon, bukan karakter)</option>
+              <option value="trellisRemote">TRELLIS.2 (butuh server 24GB — hanya HF Space)</option>
+              <option value="hunyuanRemote">Hunyuan3D (Community License, 16–29GB — cek batas EU/UK)</option>
             </select>
           </label>
+          <p class="hint mono" style="font-size:11px;line-height:1.3;color:#8ab4d0">TripoSR butuh: 1 karakter tengah, front-view, bg bersih, crop 1:1 ideal 512×512. Sheet multi-karakter → potong salah satu di bawah. Tanpa GPU, pilih Silhouette (gepeng) — jujur bukan neural.</p>
           <div class="row-buttons wrap">
             <button id="generate3D" class="btn primary" type="button" disabled>Buat mesh 3D dari gambar</button>
             <button id="clearImage" class="btn" type="button" disabled>Hapus gambar</button>
@@ -78,8 +90,12 @@
             <button id="testImageDeform" class="btn" type="button" disabled>Uji deformasi</button>
           </div>
           <div id="imageReport" class="report hint"></div>
+          <div id="imageConsent" class="hidden" style="background:#1a2a1a;border:1px solid #2d5a2d;border-radius:6px;padding:8px;margin-top:6px">
+            <p class="hint mono" style="font-size:11px;color:#9dd29d;margin:0 0 6px 0"><b>Persetujuan pihak ketiga:</b> TripoSR/Hunyuan akan mengirim gambar terpotong ke <code>huggingface.co/spaces</code> (gratis, MIT). Tidak ada API berbayar. Jika Space sedang down (503) akan ditandai gagal, bukan sukses palsu. Lanjutkan?</p>
+            <label class="check"><input id="consentRemote" type="checkbox" /> <span style="font-size:12px">Saya setuju mengirim crop ini ke HF Space untuk inferensi</span></label>
+          </div>
           <p class="hint mono" style="font-size:11px;line-height:1.4">
-            <b>Keterbatasan jujur:</b> ekstrusi siluet = punggung datar, celah kaki menempel, tanpa detail 360°. Bukan rekonstruksi neural. Hasil tetap <b>geometri 3D bervolume</b> (depth 0.2–0.4m, dapat di-orbit dari samping/belakang). Detail lengkap di <code>docs/AUDIT-IMAGE-TO-3D.md</code>.
+            <b>Keterbatasan jujur (Tahap 1):</b> ekstrusi siluet uniform depth 0.22×tinggi = punggung datar, bertumpuk jika sheet multi-karakter, celah kaki menempel, back mirror front — <b>bukan volume anatomi</b> (kepala/torso/lengan/kaki tidak berbeda tebal). Tetap geometri 3D (depth 0.37m) tapi gepeng. Untuk volume nyata butuh TripoSR neural di server GPU 6GB. Detail <code>docs/AUDIT-VOLUMETRIK-IMAGE-TO-3D.md</code>.
           </p>
         </section>
 
