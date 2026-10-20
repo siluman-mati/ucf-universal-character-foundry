@@ -4,8 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="color-scheme" content="dark" />
-  <meta name="description" content="Universal Character Foundry v1.1 — Tahap 5: viewport 3D, humanoid prosedural, rigging, sistem modul, dan animasi/retargeting." />
-  <title>Universal Character Foundry — Tahap 6</title>
+  <meta name="description" content="Universal Character Foundry v1.1 — Tahap 7: ekspor GLB dan verifikasi round-trip." />
+  <title>Universal Character Foundry — Tahap 7</title>
   <link rel="stylesheet" href="./src/styles.css" />
 </head>
 <body>
@@ -15,7 +15,7 @@
         <div class="brand-mark" aria-hidden="true">UCF</div>
         <div class="brand-text">
           <strong>Universal Character Foundry</strong>
-          <span>v1.1 · Tahap 6 — kompatibilitas &amp; retargeting</span>
+          <span>v1.1 · Tahap 7 — ekspor & verifikasi</span>
         </div>
       </div>
       <div class="topbar-actions">
@@ -217,9 +217,21 @@
           <div id="animMapReport" class="anim-map"></div>
         </section>
 
+        <section class="panel-section" id="exportSection">
+          <div class="section-head"><h2>9 · Ekspor & verifikasi</h2><span id="exportCount" class="count">belum diekspor</span></div>
+          <p class="hint">Ekspor humanoid terpilih (geometri + skin weights + rig + material) sebagai GLB, lalu impor ulang untuk perbandingan mesh / skeleton / deformasi / animasi / material.</p>
+          <div class="row-buttons wrap">
+            <button id="exportGLB" class="btn primary" type="button">Ekspor GLB</button>
+            <button id="reimportGLB" class="btn" type="button">Impor ulang GLB</button>
+            <button id="downloadGLB" class="btn" type="button">Unduh GLB</button>
+          </div>
+          <div id="exportReport" class="hint"></div>
+          <div id="exportHint" class="hint"></div>
+        </section>
+
         <section class="panel-section grow">
           <div class="section-head">
-            <h2>9 · Status validasi</h2>
+            <h2>10 · Status validasi</h2>
             <span id="validationSummary" class="count">—</span>
           </div>
           <div id="validationList" class="validation-list" aria-live="polite"></div>
@@ -229,13 +241,7 @@
         <section class="panel-section">
           <div class="section-head"><h2>Batasan tahap ini</h2></div>
           <p class="hint">
-            Tahap 6 mencakup 35 parameter humanoid, skeleton 51 tulang, skin weights teruji,
-            sistem modul dengan validasi kompatibilitas, serta animasi: 5 klip native, pemutaran
-            klip asli model impor, retargeting berbasis struktur tulang (bukan nama), dan
-            pengukuran deformasi mesh. Termasuk: impor FBX/VRM, verifikasi material/multi-mesh, dan 10 model eksternal. Belum aktif: ekspor GLB/FBX/VRM dan kompatibilitas
-            model/animasi eksternal menyeluruh — keduanya diuji di Tahap 6–7. Retarget di sini
-            hanya dibuktikan pada satu sumber uji (XBot/Mixamo); model luar lain belum diuji.
-            Tombol untuk fitur yang belum ada sengaja tidak dibuat.
+            Tahap 7 mencakup ekspor GLB (humanoid + modul + skin weights + animasi) dan verifikasi round-trip: mesh, skeleton, deformasi, animasi, material. Tahap 6 terpenuhi (10 model eksternal, FBX/VRM, 26 cek).
           </p>
         </section>
       </aside>

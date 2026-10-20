@@ -11,6 +11,7 @@ import { HumanoidController } from './humanoid/controller.js';
 import { VIEW_ORDER, directionErrorDegrees } from './camera.js';
 import { formatNumber } from './format.js';
 import { inspectModel } from './anim/inspect.js';
+import { ExportPanel } from './export/exportPanel.js';
 
 const $ = (selector) => document.querySelector(selector);
 const ui = {
@@ -94,6 +95,13 @@ humanoid = new HumanoidController({
     updateRenderInfo();
   },
   status: setStatus
+});
+
+const exporter = new ExportPanel({ viewport, humanoid, log, status: setStatus });
+exporter.bind({
+  exportBtn: document.getElementById('exportGLB'),
+  reimportBtn: document.getElementById('reimportGLB'),
+  downloadBtn: document.getElementById('downloadGLB')
 });
 
 /* ------------------------------------------------------------------ */
@@ -829,8 +837,8 @@ renderValidation();
 booted = true;
 
 window.__ucf = {
-  version: '1.1.0-stage5',
-  stage: 5,
+  version: '1.1.0-stage7',
+  stage: 7,
   ready: true,
   get cameraSettled() {
     return viewport.cameraSettled;
@@ -1000,6 +1008,7 @@ window.__ucf = {
       }
     };
   },
+  get exporter() { return exporter; },
   // Untuk pengukuran/pengujian lanjutan; bukan API publik aplikasi.
   get scene() {
     return viewport.scene;

@@ -136,7 +136,7 @@ async function main() {
 
   await page.goto(BASE);
   await page.waitForFunction(() => window.__ucf?.ready);
-  check('Aplikasi UCF termuat (stage 5)', await page.evaluate(() => window.__ucf.stage) === 5, {
+  check('Aplikasi UCF termuat (stage 5)', (await page.evaluate(() => window.__ucf.stage)) >= 5, {
     versi: await page.evaluate(() => window.__ucf.version)
   });
 
