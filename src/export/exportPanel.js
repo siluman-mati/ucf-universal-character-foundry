@@ -25,7 +25,35 @@ export class ExportPanel {
   }
 
   entryToExport() {
-    return this.humanoid?.current() || null;
+    // Prioritas: humanoid terpilih, lalu model viewport terpilih (untuk image-to-3D), lalu model pertama
+    const h = this.humanoid?.current();
+    if (h) return h;
+    // Fallback untuk image-to-3D: cari model yang dipilih di viewport atau model pertama yang bukan helper
+    const selId = this.viewport?.models?.find(m=>m.id===this.viewport?._selectedModelId)?.id || this.viewport?.models?.[0]?.id;
+    // Coba dapatkan entry humanoid dari viewport model jika ada, atau buat entry sintetis dari viewport model
+    if (selId) {
+      const vm = this.viewport.modelById(selId) || this.viewport.models[0];
+      if (vm) {
+        // Jika vm adalah humanoid, humanoid.current() sudah handle; jika bukan, buat entry kompatibel
+        // Buat entry minimal yang bisa di-clone sebagai Group
+        if (!vm.root) return null;
+        // Untuk model non-humanoid (image-to-3D), buat entry sintetis
+        // Cek apakah ini model image-to-3D atau GLB biasa → tetap ekspor sebagai Group
+        const isHumanoid = vm.root.userData?.ucfRig || vm.root.children.some(c=>c.userData?.ucfRig);
+        if (!isHumanoid) {
+          // Entry sintetis: content = root clone target, name, stats
+          return {
+            name: vm.name,
+            content: vm.root,
+            stats: vm.stats,
+            modelId: vm.id,
+            // Untuk koleksi animasi, kosongkan jika bukan humanoid
+            isGeneric: true
+          };
+        }
+      }
+    }
+    return null;
   }
 
   attachSelectionHook() {

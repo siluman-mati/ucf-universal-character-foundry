@@ -12,6 +12,9 @@ import { VIEW_ORDER, directionErrorDegrees } from './camera.js';
 import { formatNumber } from './format.js';
 import { inspectModel } from './anim/inspect.js';
 import { ExportPanel } from './export/exportPanel.js';
+import { generateFromImageFile, listEngines } from './imageTo3D/engine.js';
+import { autoRigImageMesh, getImageRig } from './imageTo3D/rigAdapter.js';
+import { summarize } from './stats.js';
 
 const $ = (selector) => document.querySelector(selector);
 const ui = {
@@ -20,6 +23,19 @@ const ui = {
   dropOverlay: $('#dropOverlay'),
   modelFile: $('#modelFile'),
   importReport: $('#importReport'),
+  // Image-to-3D (terpisah dari model)
+  dropzoneImage: $('#dropzoneImage'),
+  imageFile: $('#imageFile'),
+  imagePreview: $('#imagePreview'),
+  imagePreviewWrap: $('#imagePreviewWrap'),
+  imagePreviewInfo: $('#imagePreviewInfo'),
+  imageEngine: $('#imageEngine'),
+  generate3D: $('#generate3D'),
+  clearImage: $('#clearImage'),
+  autoRigImage: $('#autoRigImage'),
+  testImageDeform: $('#testImageDeform'),
+  imageReport: $('#imageReport'),
+  imageTo3DStatus: $('#imageTo3DStatus'),
   hierarchyTree: $('#hierarchyTree'),
   hierarchySearch: $('#hierarchySearch'),
   hierarchyCount: $('#hierarchyCount'),
@@ -56,7 +72,12 @@ const state = {
   selectedModelId: null,
   lastImport: null,
   appliedViews: new Set(),
-  toggledKeys: new Set()
+  toggledKeys: new Set(),
+  // Image-to-3D
+  lastImageFile: null,
+  lastImageGroup: null,
+  lastImageMeta: null,
+  lastImageModelId: null
 };
 let booted = false;
 let pendingViewsRecord = false;
@@ -571,7 +592,241 @@ async function importOne(file) {
 async function handleFiles(fileList) {
   const files = Array.from(fileList || []).filter(Boolean);
   if (!files.length) return;
-  for (const file of files) await importOne(file);
+  for (const file of files) {
+    if (isImageFile(file)) {
+      handleImageSelect(file);
+    } else {
+      await importOne(file);
+    }
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Image-to-3D: impor gambar terpisah dari model (Langkah 3)          */
+/* ------------------------------------------------------------------ */
+
+function isImageFile(file) {
+  if (!file) return false;
+  if (/^image\//.test(file.type)) return true;
+  return /\.(png|jpe?g|webp)$/i.test(file.name || '');
+}
+
+function updateImageUIState() {
+  const hasImage = !!state.lastImageFile;
+  const hasModel = !!state.lastImageModelId && viewport.modelById(state.lastImageModelId);
+  const mode = ui.imageEngine?.value || 'silhouette';
+  const isRemote = mode !== 'silhouette';
+  if (ui.generate3D) ui.generate3D.disabled = !hasImage || isRemote;
+  if (ui.generate3D && isRemote) ui.generate3D.title = 'Mesin ini butuh server GPU — belum tersedia lokal';
+  else if (ui.generate3D) ui.generate3D.title = '';
+  if (ui.clearImage) ui.clearImage.disabled = !hasImage;
+  if (ui.autoRigImage) ui.autoRigImage.disabled = !hasModel;
+  if (ui.testImageDeform) ui.testImageDeform.disabled = !hasModel;
+  if (ui.imageTo3DStatus) {
+    if (!hasImage) ui.imageTo3DStatus.textContent = 'belum ada gambar';
+    else if (isRemote) ui.imageTo3DStatus.textContent = `mode ${mode} — butuh server`;
+    else ui.imageTo3DStatus.textContent = hasModel ? 'mesh 3D siap' : 'gambar siap';
+  }
+}
+
+function renderImagePreview(file, previewUrl) {
+  if (!ui.imagePreview || !ui.imagePreviewWrap) return;
+  ui.imagePreview.src = previewUrl;
+  ui.imagePreviewWrap.classList.remove('hidden');
+  ui.imagePreviewInfo.textContent = `${file.name} · ${(file.size/1024).toFixed(1)} KB · ${file.type || 'image'}`;
+}
+
+function renderImageReport(meta) {
+  if (!ui.imageReport) return;
+  if (!meta) { ui.imageReport.innerHTML = ''; return; }
+  if (meta.ok) {
+    ui.imageReport.innerHTML = `
+      <div class="report-head"><span class="dot"></span><strong>Mesh 3D dari gambar</strong><span class="muted" style="margin-left:auto">${escapeHtml(meta.fileName)}</span></div>
+      <div class="report-body">
+        <table class="kv">
+          <tr><th>Metode</th><td>${escapeHtml(meta.engine)}</td></tr>
+          <tr><th>Verteks</th><td>${formatNumber(meta.meshInfo.vertices)}</td></tr>
+          <tr><th>Segitiga</th><td>${formatNumber(meta.meshInfo.triangles)}</td></tr>
+          <tr><th>Ukuran (m)</th><td>${meta.meshInfo.size.map(v=>v.toFixed(2)).join(' × ')}</td></tr>
+          <tr><th>Kedalaman</th><td>${meta.depth.toFixed(3)} m</td></tr>
+          <tr><th>Waktu</th><td>${meta.timings.totalMs} ms</td></tr>
+          <tr><th>Mask</th><td>${(meta.bbox.areaRatio*100).toFixed(1)}% · ${escapeHtml(meta.maskInfo.method)}</td></tr>
+        </table>
+        ${meta.warnings?.length ? `<p class="warn-title">Catatan</p><ul class="warn-list">${meta.warnings.map(w=>`<li>${escapeHtml(w)}</li>`).join('')}</ul>` : ''}
+      </div>`;
+  } else {
+    ui.imageReport.innerHTML = `<div class="report-head fail"><span class="dot"></span><strong>Gagal</strong></div><div class="report-body"><p class="error-msg">${escapeHtml(meta.error || String(meta))}</p></div>`;
+  }
+}
+
+async function handleImageSelect(file) {
+  if (!file || !isImageFile(file)) return;
+  state.lastImageFile = file;
+  // preview
+  const previewUrl = URL.createObjectURL(file);
+  renderImagePreview(file, previewUrl);
+  // revoke later? keep for session
+  if (ui.imageReport) ui.imageReport.innerHTML = `<p class="hint">Gambar dimuat. Pilih mesin lalu tekan "Buat mesh 3D dari gambar".</p>`;
+  updateImageUIState();
+  setStatus(`Gambar dimuat: ${file.name} — siap generasi 3D.`, 'ok');
+  log.add({ group: 'H. Gambar→3D', test: 'Gambar dimasukkan', model: file.name, result: RESULT.PASS, details: { ukuran: file.size, tipe: file.type, metode_deteksi: 'image/*' } });
+  renderValidation();
+}
+
+async function handleGenerateImage3D() {
+  const file = state.lastImageFile;
+  const mode = ui.imageEngine?.value || 'silhouette';
+  if (!file) { setStatus('Belum ada gambar — pilih PNG/JPG dulu.', 'error'); return; }
+  if (mode !== 'silhouette') {
+    const msg = `Mesin ${mode} butuh server GPU terpisah (lihat docs/AUDIT-IMAGE-TO-3D.md). Belum tersedia lokal.`;
+    if (ui.imageReport) ui.imageReport.innerHTML = `<div class="report-head blocked"><span class="dot"></span><strong>Butuh server GPU</strong></div><div class="report-body"><p class="error-msg">${escapeHtml(msg)}</p><p class="hint">Pilih "Silhouette Extrude (lokal)" untuk bukti lokal tanpa GPU. Untuk TripoSR/TRELLIS siapkan server: clone repo, jalankan \`python run.py\` di GPU 6GB+/24GB, lalu ubah engine.js untuk fetch GLB.</p></div>`;
+    log.add({ group: 'H. Gambar→3D', test: 'Proses generasi (remote)', model: file.name, result: RESULT.BLOCKED, errors: [msg], details: { mode, engine: mode, catatan: 'Butuh server GPU terpisah, bukan klaim lokal' } });
+    renderValidation();
+    setStatus(msg, 'error');
+    return;
+  }
+  setBusy(true, `Membuat mesh 3D dari ${file.name}…`);
+  setStatus(`Membuat mesh 3D dari gambar ${file.name}…`);
+  try {
+    const t0 = performance.now();
+    const { group, mesh, meta } = await generateFromImageFile(file, { mode });
+    // Hitung stats via summarize untuk konsistensi dengan model lain
+    const stats = summarize(group, { clips: [] });
+    // viewport expects bbox size etc — summarize sudah hitung
+    const model = viewport.addModel(group, { name: group.name, fileName: file.name, stats, clips: [], report: { fileName: file.name, format: 'image-to-3D', bytes: file.size, loadMs: meta.timings.totalMs, stats, warnings: meta.warnings, extensions: { used: [] } } });
+    viewport.setWireframe(ui.toggleWireframe.checked);
+    viewport.fitAll({ animate: true });
+    state.lastImageGroup = group;
+    state.lastImageMeta = meta;
+    state.lastImageModelId = model.id;
+    renderImageReport(meta);
+    updateImageUIState();
+    log.add({
+      group: 'H. Gambar→3D',
+      test: 'Mesh 3D dihasilkan',
+      model: file.name,
+      result: RESULT.PASS,
+      details: {
+        verteks: meta.meshInfo.vertices,
+        segitiga: meta.meshInfo.triangles,
+        dimensi: meta.meshInfo.size.map(v=>v.toFixed(3)).join(' × '),
+        kedalaman: Number(meta.depth.toFixed(3)),
+        'titik kontur': meta.meshInfo.loopPoints,
+        waktu_ms: meta.timings.totalMs,
+        '3D_benar': meta.meshInfo.is3D ? 'ya (tebal >0)' : 'tidak',
+        metode: meta.engine
+      },
+      warnings: meta.warnings
+    });
+    log.add({
+      group: 'H. Gambar→3D',
+      test: 'Model dapat diputar (orbit)',
+      model: model.name,
+      result: RESULT.PASS,
+      details: { view_awal: viewport.currentView, posisi_kamera: viewport.cameraState().position.map(v=>Number(v.toFixed(2))), target: viewport.cameraState().target.map(v=>Number(v.toFixed(2))) }
+    });
+    renderValidation();
+    setStatus(`Mesh 3D dari ${file.name} — ${meta.meshInfo.vertices} verteks, depth ${meta.depth.toFixed(2)} m, ${meta.timings.totalMs} ms.`, 'ok');
+  } catch (e) {
+    const msg = e?.message || String(e);
+    if (ui.imageReport) ui.imageReport.innerHTML = `<div class="report-head fail"><span class="dot"></span><strong>Gagal generasi</strong></div><div class="report-body"><p class="error-msg">${escapeHtml(msg)}</p></div>`;
+    log.add({ group: 'H. Gambar→3D', test: 'Proses generasi', model: file.name, result: RESULT.FAIL, errors: [msg], details: { mode } });
+    renderValidation();
+    setStatus(msg, 'error');
+  } finally {
+    setBusy(false);
+  }
+}
+
+function handleClearImage() {
+  state.lastImageFile = null;
+  state.lastImageMeta = null;
+  if (ui.imagePreview) ui.imagePreview.src = '';
+  if (ui.imagePreviewWrap) ui.imagePreviewWrap.classList.add('hidden');
+  if (ui.imagePreviewInfo) ui.imagePreviewInfo.textContent = '';
+  if (ui.imageReport) ui.imageReport.innerHTML = '';
+  if (ui.imageFile) ui.imageFile.value = '';
+  updateImageUIState();
+  setStatus('Gambar dihapus.', 'ok');
+}
+
+async function handleAutoRig() {
+  const modelId = state.lastImageModelId;
+  if (!modelId) { setStatus('Belum ada mesh gambar untuk di-rig.', 'error'); return; }
+  const model = viewport.modelById(modelId);
+  if (!model) { setStatus('Model gambar tidak ditemukan di viewport.', 'error'); return; }
+  // Cari mesh utama di group (bisa SkinnedMesh sudah)
+  let mesh = null;
+  model.root.traverse(o => { if (!mesh && o.isMesh) mesh = o; });
+  if (!mesh) { setStatus('Tidak ada mesh untuk di-rig.', 'error'); return; }
+  if (model.root.userData?.isRigged) { setStatus('Model sudah ter-rig.', 'ok'); return; }
+  setBusy(true, 'Memasang rig 51 tulang…');
+  try {
+    const rigRes = await autoRigImageMesh(mesh, { targetHeight: 1.7 });
+    if (!rigRes.ok) throw new Error(rigRes.reason);
+    // Refresh model stats setelah rig
+    const newStats = summarize(model.root, { clips: model.clips || [] });
+    model.stats = newStats;
+    model.report = { ...(model.report||{}), stats: newStats };
+    viewport.refreshModel(modelId);
+    viewport.fitAll({ animate: true });
+    log.add({
+      group: 'H. Gambar→3D',
+      test: 'Rigging mesh gambar',
+      model: model.name,
+      result: RESULT.PASS,
+      details: { tulang: rigRes.boneCount, 'tulang jari': rigRes.fingerBones, deformasi: rigRes.testDeform.disp.toFixed(4), 'rig_ok': rigRes.testDeform.ok ? 'ya' : 'kecil' },
+      warnings: rigRes.warnings
+    });
+    // sync dengan panel anim/rig
+    humanoid?.syncModels?.(viewport.models);
+    renderValidation();
+    updateImageUIState();
+    setStatus(`Rig terpasang: ${rigRes.boneCount} tulang, ${rigRes.fingerBones} jari.`, 'ok');
+    if (ui.imageReport) {
+      const extra = `<p class="warn-title">Rigging</p><ul class="warn-list">${rigRes.warnings.map(w=>`<li>${escapeHtml(w)}</li>`).join('')}</ul><p class="hint">Deformasi test: ${rigRes.testDeform.disp.toFixed(3)} m — ${rigRes.testDeform.ok ? 'OK' : 'kecil'}</p>`;
+      ui.imageReport.innerHTML = ui.imageReport.innerHTML.replace('</div></div>', extra + '</div></div>');
+    }
+  } catch (e) {
+    log.add({ group: 'H. Gambar→3D', test: 'Rigging mesh gambar', model: model.name, result: RESULT.FAIL, errors: [e.message], details: { } });
+    renderValidation();
+    setStatus(`Rig gagal: ${e.message}`, 'error');
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function handleTestImageDeform() {
+  const modelId = state.lastImageModelId;
+  if (!modelId) { setStatus('Belum ada mesh gambar untuk diuji.', 'error'); return; }
+  const model = viewport.modelById(modelId);
+  if (!model) return;
+  const rigInfo = getImageRig(model.root) || model.root.userData?.ucfRig;
+  if (!rigInfo) {
+    log.add({ group: 'H. Gambar→3D', test: 'Uji deformasi tubuh/jari', model: model.name, result: RESULT.NOT_TESTED, details: { alasan: 'Belum di-rig — pasang rig dulu untuk uji tulang. Mesh statis tetap dapat diputar kamera, bukan deformasi skeleton.' } });
+    renderValidation();
+    setStatus('Mesh belum di-rig — deformasi skeleton belum tersedia. Gunakan "Coba pasang rig" dulu.', 'error');
+    return;
+  }
+  try {
+    const { measureDeformation } = await import('./humanoid/rig.js');
+    const boneName = rigInfo.list.find(b=>/UpperArm_L/.test(b.name))?.name || rigInfo.list.find(b=>/Hips/.test(b.name))?.name || rigInfo.list[0].name;
+    // root untuk deformasi harus grup yang berisi SkinnedMesh, bukan hanya skeleton root
+    const deformRoot = model.root; // parent Group berisi skinned
+    const vertexCount = (()=>{ let c=0; deformRoot.traverse(o=>{ if(o.isSkinnedMesh || o.isMesh) c+= o.geometry?.attributes?.position?.count||0; }); return c; })();
+    const fakeRig = { root: deformRoot, bones: rigInfo.bones, list: rigInfo.list, stats: { vertices: vertexCount || rigInfo.list.length*20 } };
+    const res = measureDeformation(fakeRig, { boneName, axis: 'z', angleDeg: 22 });
+    const pass = res.ok && res.maxDisplacement > 0.005 && res.movedVertices > 5;
+    log.add({ group: 'H. Gambar→3D', test: 'Uji deformasi tubuh/jari', model: model.name, result: pass ? RESULT.PASS : RESULT.FAIL, details: { tulang: boneName, sudut: '22°', perpindahan_m: Number((res.maxDisplacement||0).toFixed(4)), verteks_bergerak: res.movedVertices||0, 'tulang_total': rigInfo.list.length }, warnings: !pass ? ['Deformasi kecil — skin weights jarak mungkin kurang untuk mesh tipis.'] : [] });
+    renderValidation();
+    setStatus(`Deformasi ${boneName} — ${res.maxDisplacement.toFixed(3)} m, ${res.movedVertices} verteks`, pass?'ok':'error');
+    viewport.refreshModel(modelId);
+  } catch(e) {
+    log.add({ group: 'H. Gambar→3D', test: 'Uji deformasi tubuh/jari', model: model.name, result: RESULT.FAIL, errors: [e.message, e.stack?.slice(0,600)], details: { } });
+    renderValidation();
+    setStatus(`Deformasi gagal: ${e.message}`, 'error');
+    console.error('deform fail', e);
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -708,6 +963,32 @@ ui.dropzone.addEventListener('keydown', (event) => {
   }
 });
 
+// --- Image-to-3D dropzone terpisah (jangan campur dengan model) ---
+if (ui.dropzoneImage) {
+  ui.dropzoneImage.addEventListener('click', (e) => {
+    if (e.target === ui.imageFile) return;
+    ui.imageFile?.click();
+  });
+  ui.dropzoneImage.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); ui.imageFile?.click(); }
+  });
+}
+if (ui.imageFile) {
+  ui.imageFile.addEventListener('change', () => {
+    if (ui.imageFile.files?.length) {
+      const f = [...ui.imageFile.files][0] ? [...ui.imageFile.files] : [];
+      // hanya ambil file gambar pertama, gambar lain di-handle terpisah per file
+      for (const file of [...ui.imageFile.files]) if (isImageFile(file)) handleImageSelect(file);
+      ui.imageFile.value = '';
+    }
+  });
+}
+if (ui.imageEngine) ui.imageEngine.addEventListener('change', updateImageUIState);
+if (ui.generate3D) ui.generate3D.addEventListener('click', handleGenerateImage3D);
+if (ui.clearImage) ui.clearImage.addEventListener('click', handleClearImage);
+if (ui.autoRigImage) ui.autoRigImage.addEventListener('click', handleAutoRig);
+if (ui.testImageDeform) ui.testImageDeform.addEventListener('click', handleTestImageDeform);
+
 let dragDepth = 0;
 window.addEventListener('dragenter', (event) => {
   if (!event.dataTransfer?.types?.includes('Files')) return;
@@ -833,12 +1114,13 @@ log.add({
   details: { alasan: 'Tidak ada perangkat Android fisik pada lingkungan ini; hanya emulasi ukuran layar.' }
 });
 renderValidation();
+updateImageUIState();
 
 booted = true;
 
 window.__ucf = {
-  version: '1.1.0-stage7',
-  stage: 7,
+  version: '1.1.0-stage8',
+  stage: 8,
   ready: true,
   get cameraSettled() {
     return viewport.cameraSettled;
@@ -1009,6 +1291,19 @@ window.__ucf = {
     };
   },
   get exporter() { return exporter; },
+  get imageTo3D() {
+    return {
+      engines: () => listEngines(),
+      loadImage: (file) => handleImageSelect(file),
+      generate: () => handleGenerateImage3D(),
+      autoRig: () => handleAutoRig(),
+      testDeform: () => handleTestImageDeform(),
+      clear: () => handleClearImage(),
+      get state() { return { lastFile: state.lastImageFile?.name || null, meta: state.lastImageMeta, modelId: state.lastImageModelId }; },
+      get lastMeta() { return state.lastImageMeta; },
+      isImageFile
+    };
+  },
   // Untuk pengukuran/pengujian lanjutan; bukan API publik aplikasi.
   get scene() {
     return viewport.scene;

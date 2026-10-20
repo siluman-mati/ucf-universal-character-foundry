@@ -42,6 +42,47 @@
           <div id="importReport" class="report hidden" aria-live="polite"></div>
         </section>
 
+        <section class="panel-section" id="imageSection">
+          <div class="section-head">
+            <h2>1b · Gambar referensi → 3D</h2>
+            <span id="imageTo3DStatus" class="count">belum ada gambar</span>
+          </div>
+          <p class="hint">
+            Unggah gambar karakter (PNG/JPG front-view, latar polos/putih). Mesin lokal <b>Silhouette Extrude</b> akan membuat mesh 3D bervolume (bukan plane) yang dapat diputar, di-rigging, dan diekspor GLB. Untuk rekonstruksi neural 360° (TripoSR/TRELLIS) butuh server GPU terpisah — lihat laporan audit.
+          </p>
+          <div id="dropzoneImage" class="dropzone" tabindex="0" role="button" aria-label="Area impor gambar referensi">
+            <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M12 3v11m0-11 4 4m-4-4-4 4M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3M8 10l2.2 2.6 2.8-3.6 3 4H8z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <div class="dropzone-title">Lepaskan gambar di sini</div>
+            <div class="dropzone-sub">atau <u>pilih gambar</u> · .png, .jpg, .jpeg</div>
+            <input id="imageFile" type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" hidden />
+          </div>
+          <div id="imagePreviewWrap" class="image-preview hidden">
+            <img id="imagePreview" alt="Pratinjau gambar referensi" />
+            <div id="imagePreviewInfo" class="hint mono"></div>
+          </div>
+          <label class="field">
+            <span>Mesin generasi</span>
+            <select id="imageEngine" class="select">
+              <option value="silhouette" selected>Silhouette Extrude (lokal, cepat) — mesh solid 3D</option>
+              <option value="tripoRemote">TripoSR (butuh server GPU — belum tersedia)</option>
+              <option value="trellisRemote">TRELLIS.2 (butuh server 24GB — belum tersedia)</option>
+              <option value="hunyuanRemote">Hunyuan3D (butuh server 16GB — belum tersedia)</option>
+            </select>
+          </label>
+          <div class="row-buttons wrap">
+            <button id="generate3D" class="btn primary" type="button" disabled>Buat mesh 3D dari gambar</button>
+            <button id="clearImage" class="btn" type="button" disabled>Hapus gambar</button>
+          </div>
+          <div class="row-buttons wrap">
+            <button id="autoRigImage" class="btn" type="button" disabled>Coba pasang rig (51 tulang)</button>
+            <button id="testImageDeform" class="btn" type="button" disabled>Uji deformasi</button>
+          </div>
+          <div id="imageReport" class="report hint"></div>
+          <p class="hint mono" style="font-size:11px;line-height:1.4">
+            <b>Keterbatasan jujur:</b> ekstrusi siluet = punggung datar, celah kaki menempel, tanpa detail 360°. Bukan rekonstruksi neural. Hasil tetap <b>geometri 3D bervolume</b> (depth 0.2–0.4m, dapat di-orbit dari samping/belakang). Detail lengkap di <code>docs/AUDIT-IMAGE-TO-3D.md</code>.
+          </p>
+        </section>
+
         <section class="panel-section grow">
           <div class="section-head">
             <h2>2 · Hierarki objek</h2>
